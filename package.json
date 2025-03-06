@@ -1,0 +1,20 @@
+{
+  "name": "grass-points",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "prisma": "^6.4.1",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "axios": "^1.8.1",
+    "https-proxy-agent": "^7.0.6"
+  }
+}
