@@ -12,3 +12,24 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id                  Int           @id @default(autoincrement())
+  username            String
+  login               String
+  password            String
+  email               String
+  emailPassword       String
+  proxy               String
+  points              Int           @default(0)
+  accountStatus       AccountStatus @default(OFFLINE)
+  accountLaunchTime   DateTime?
+  accountShutdownTime DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+enum AccountStatus {
+  ONLINE
+  OFFLINE
+}
