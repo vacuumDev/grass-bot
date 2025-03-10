@@ -13,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Account {
   id                  Int           @id @default(autoincrement())
   username            String
   userId              String
@@ -22,7 +22,7 @@ model User {
   password            String
   email               String
   emailPassword       String
-  proxy               String
+  proxies             String[]
   points              Int           @default(0)
   accountStatus       AccountStatus @default(OFFLINE)
   accountLaunchTime   DateTime?
