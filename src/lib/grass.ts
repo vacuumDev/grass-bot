@@ -27,73 +27,101 @@ export default class Grass {
         this.currentProxyUrl = ProxyManager.getProxy() as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
         this.browserId = uuidv4();
-        console.log(this.browserId)
+        console.log(this.browserId);
     }
 
     // Log in and set up the axios instance.
     async login(email: string, password: string): Promise<void> {
-        const res: AxiosResponse<ApiResponseDto<LoginResponseData>> = await axios.post('https://api.getgrass.io/login', {
-            username: email,
-            password,
-            v: "5.1.1"
-        }, {
-            httpsAgent: this.proxy,
-            httpAgent: this.proxy,
-            timeout: 20000
-        });
+        try {
+            const res: AxiosResponse<ApiResponseDto<LoginResponseData>> = await axios.post(
+                'https://api.getgrass.io/login',
+                {
+                    username: email,
+                    password,
+                    v: "5.1.1"
+                },
+                {
+                    httpsAgent: this.proxy,
+                    httpAgent: this.proxy,
+                    timeout: 20000
+                }
+            );
 
-        this.accessToken = res.data.result.data.accessToken;
-        this.refreshToken = res.data.result.data.refreshToken;
+            this.accessToken = res.data.result.data.accessToken;
+            this.refreshToken = res.data.result.data.refreshToken;
 
-        const config: AxiosRequestConfig = {
-            baseURL: 'https://api.getgrass.io',
-            headers: {
-                'Authorization': this.accessToken,
-                'User-Agent': this.userAgent
-            },
-            httpsAgent: this.proxy,
-            httpAgent: this.proxy,
-            timeout: 20000
-        };
+            const config: AxiosRequestConfig = {
+                baseURL: 'https://api.getgrass.io',
+                headers: {
+                    'Authorization': this.accessToken,
+                    'User-Agent': this.userAgent
+                },
+                httpsAgent: this.proxy,
+                httpAgent: this.proxy,
+                timeout: 20000
+            };
 
-        this.grassApi = axios.create(config);
+            this.grassApi = axios.create(config);
 
-        // Retrieve user data to set userId.
-        const user: UserResponseData = await this.getUser();
-        this.userId = user.userId;
+            // Retrieve user data to set userId.
+            const user: UserResponseData = await this.getUser();
+            this.userId = user.userId;
+        } catch (error) {
+            console.error("Error during login:", error);
+            await this.reconnect();
+            throw error;
+        }
     }
 
     async getUser(): Promise<UserResponseData> {
-        const res: AxiosResponse<ApiResponseDto<UserResponseData>> = await this.grassApi.get('/retrieveUser');
-        return res.data.result.data;
+        try {
+            const res: AxiosResponse<ApiResponseDto<UserResponseData>> = await this.grassApi.get('/retrieveUser');
+            return res.data.result.data;
+        } catch (error) {
+            console.error("Error retrieving user data:", error);
+            await this.reconnect();
+            throw error;
+        }
     }
 
     async getIpInfo(): Promise<IpResponseData> {
-        const res: AxiosResponse<ApiResponseDto<IpResponseData>> = await this.grassApi.get('/activeIps');
-        return res.data.result.data;
+        try {
+            const res: AxiosResponse<ApiResponseDto<IpResponseData>> = await this.grassApi.get('/activeIps');
+            return res.data.result.data;
+        } catch (error) {
+            console.error("Error retrieving IP info:", error);
+            await this.reconnect();
+            throw error;
+        }
     }
 
     // Check‑in call similar to the Python version.
-    async checkIn(): Promise<{destinations: string[], token: string}> {
-        const data = {
-            browserId: this.browserId,
-            userId: this.userId,
-            version: "5.1.1",
-            extensionId: "ilehaonighjijnmpnagapkhpcdbhclfg",
-            userAgent: this.userAgent,
-            deviceType: "extension"
-        };
-        const res = await axios.post('https://director.getgrass.io/checkin', data, {
-            httpsAgent: this.proxy,
-            httpAgent: this.proxy,
-            timeout: 20000
-        });
-        console.log(res.data)
-        const responseData = res.data;
-        if (!responseData.destinations || responseData.destinations.length === 0) {
-            throw new Error("No destinations returned from checkIn");
+    async checkIn(): Promise<{ destinations: string[], token: string }> {
+        try {
+            const data = {
+                browserId: this.browserId,
+                userId: this.userId,
+                version: "5.1.1",
+                extensionId: "ilehaonighjijnmpnagapkhpcdbhclfg",
+                userAgent: this.userAgent,
+                deviceType: "extension"
+            };
+            const res = await axios.post('https://director.getgrass.io/checkin', data, {
+                httpsAgent: this.proxy,
+                httpAgent: this.proxy,
+                timeout: 20000
+            });
+            console.log(res.data);
+            const responseData = res.data;
+            if (!responseData.destinations || responseData.destinations.length === 0) {
+                throw new Error("No destinations returned from checkIn");
+            }
+            return { destinations: responseData.destinations, token: responseData.token };
+        } catch (error) {
+            console.error("Error during checkIn:", error);
+            await this.reconnect();
+            throw error;
         }
-        return { destinations: responseData.destinations, token: responseData.token };
     }
 
     /**
@@ -151,11 +179,11 @@ export default class Grass {
             }
         });
 
-        this.ws.on("error", (error: Error) => {
+        this.ws.on("error", async (error: Error) => {
             console.error("WebSocket error:", error);
             // On error, change proxy and reconnect.
             this.handleWebSocketError();
-            this.reconnect();
+            await this.reconnect();
         });
 
         this.ws.on("close", (code: number, reason: Buffer) => {
@@ -235,26 +263,21 @@ export default class Grass {
             };
         } catch (error) {
             console.error("Error performing HTTP request:", error);
+            await this.reconnect();
             throw error;
         }
     }
 
-    // Check the mining score by calling the /extension/user-score endpoint.
+    // Check the mining score by calling the /activeDevices endpoint.
     async checkMiningScore(): Promise<boolean> {
         try {
-            // Call the /devices endpoint with the input query parameter (limit = 5)
-            const res = await this.grassApi.get(`/retrieveDevice?input=%7B%22deviceId%22:%22${this.browserId}%22%7D`, { timeout: 20000 });
-
-            // Extract the devices array from the response JSON
+            const res = await this.grassApi.get('/activeDevices', { timeout: 20000 });
             const devices = res.data.result.data;
             console.log('Devices:', devices);
-
-            // Find the device where deviceId matches the current browserId
-            const device = res.data.result.data;
+            const device = devices.find((d: any) => d.deviceId === this.browserId);
 
             let currentScore = 0;
             if (device) {
-                // Get ipScore as the network score
                 currentScore = device.ipScore;
             }
             console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
@@ -272,7 +295,6 @@ export default class Grass {
         }
     }
 
-
     // Update the total points by calling the getUser endpoint.
     async updateTotalPoints(): Promise<number> {
         try {
@@ -281,6 +303,7 @@ export default class Grass {
             return user.totalPoints;
         } catch (error) {
             console.error("Error updating total points:", error);
+            await this.reconnect();
             return 0;
         }
     }
