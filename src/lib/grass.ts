@@ -8,6 +8,7 @@ import WebSocket from "ws";
 import { v4 as uuidv4 } from "uuid";
 import ProxyManager from "./proxy-manager.js";
 import fs from "fs";
+import RedisWorker from "./redis-worker.js";
 
 // Read config from data/config.json and get the delay range.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
@@ -33,7 +34,7 @@ export default class Grass {
     private currentProxyUrl: string;
     private userId!: string;
     private userAgent: string =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
     constructor() {
         this.browserId = uuidv4();
@@ -45,6 +46,26 @@ export default class Grass {
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
         try {
+            const session = await RedisWorker.getSession(email);
+            if(session) {
+                const parsedSession = JSON.parse(session);
+                this.accessToken = parsedSession.accessToken;
+                this.userId = parsedSession.userId;
+                const config: AxiosRequestConfig = {
+                    baseURL: "https://api.getgrass.io",
+                    headers: {
+                        Authorization: this.accessToken,
+                        "User-Agent": this.userAgent,
+                    },
+                    httpsAgent: this.proxy,
+                    httpAgent: this.proxy,
+                    timeout: 20000,
+                };
+
+                this.grassApi = axios.create(config);
+                return;
+            }
+
             if(this.accessToken) {
                 const config: AxiosRequestConfig = {
                     baseURL: "https://api.getgrass.io",
@@ -68,7 +89,7 @@ export default class Grass {
                 {
                     username: email,
                     password,
-                    v: "5.1.1",
+                    v: "5.0.0",
                 },
                 {
                     httpsAgent: this.proxy,
@@ -78,6 +99,7 @@ export default class Grass {
             );
 
             this.accessToken = res.data.result.data.accessToken;
+
             this.refreshToken = res.data.result.data.refreshToken;
 
             const config: AxiosRequestConfig = {
@@ -96,10 +118,13 @@ export default class Grass {
             // Retrieve user data to set userId.
             const user: UserResponseData = await this.getUser();
             this.userId = user.userId;
+            await RedisWorker.setSession(email, JSON.stringify({
+                accessToken: this.accessToken,
+                userId: this.userId
+            }));
         } catch (error) {
-            console.error("Error during login:", error);
-            await this.reconnect();
-            throw error;
+            console.error("Error during login:", error.response.data);
+            process.exit(-1)
         }
     }
 
@@ -133,8 +158,8 @@ export default class Grass {
             const data = {
                 browserId: this.browserId,
                 userId: this.userId,
-                version: "5.1.1",
-                extensionId: "ilehaonighjijnmpnagapkhpcdbhclfg",
+                version: "5.0.0",
+                extensionId: "lkbnfiajjmbhnfledhphioinpickokdi",
                 userAgent: this.userAgent,
                 deviceType: "extension",
             };
@@ -184,6 +209,7 @@ export default class Grass {
                             result: result,
                         };
                         this.sendMessage(responseMessage);
+                        console.log(`Sending HTTP_REQUEST with message: ${responseMessage}`)
                     } catch (err) {
                         console.error("Error during HTTP_REQUEST:", err);
                     }
@@ -195,6 +221,12 @@ export default class Grass {
                     };
                     this.sendMessage(pongResponse);
                 } else if (message.action === "PONG") {
+                    const pongResponse = {
+                        id: message.id,
+                        origin_action: "PONG",
+                    };
+                    this.sendMessage(pongResponse);
+                    console.log(`Sent pong message with id ${message.id}`)
                 } else if (message.action === "MINING_REWARD") {
                     // Handle mining reward messages (if available).
                     const points = message.data?.points || 0;

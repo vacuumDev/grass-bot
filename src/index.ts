@@ -2,6 +2,7 @@ import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import RedisWorker from "./lib/redis-worker.js";
+import GrassMiner from "./lib/grass";
 
 // Read and parse configuration
 const accounts = JSON.parse(fs.readFileSync('data/config.json', 'utf-8')).accounts;

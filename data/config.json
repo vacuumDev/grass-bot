@@ -1,10 +1,12 @@
 {
  "accounts": [
     {
-      "login": "ykseilbjln@rambler.ru",
-      "password": "11000345Gcoyz!",
-      "proxyThreads": 30
+      "login": "eiv92466@bcooq.com",
+      "password": "eiv92466@bcooq.com!A",
+      "proxyThreads": 200
     }
  ],
-  "delay": [100, 600]
+  "delay": [100, 600],
+  "useRotatingProxy": false,
+  "rotatingProxy": ""
 }
