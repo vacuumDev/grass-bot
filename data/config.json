@@ -1,7 +1,10 @@
-[
-  {
-    "login": "ykseilbjln@rambler.ru",
-    "password": "11000345Gcoyz!",
-    "proxyThreads": 3
-  }
-]
+{
+ "accounts": [
+    {
+      "login": "ykseilbjln@rambler.ru",
+      "password": "11000345Gcoyz!",
+      "proxyThreads": 30
+    }
+ ],
+  "delay": [100, 600]
+}

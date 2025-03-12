@@ -1,16 +1,23 @@
 import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import RedisWorker from "./lib/redis-worker.js";
 
 // Read and parse configuration
-const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
-console.log('Loaded config:', config);
+const accounts = JSON.parse(fs.readFileSync('data/config.json', 'utf-8')).accounts;
+console.log('Loaded config:', accounts);
+
+function randomDelay(): Promise<void> {
+    const min = 100;
+    const max = 10000;
+    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Function to run a worker process for given credentials
-const runWorker = (login, password) => {
+const runWorker = (login: string, password: string) => {
     return new Promise((resolve, reject) => {
         // Resolve the absolute path to worker.js
-        console.log(process.cwd(), 'worker.js')
         const workerPath = path.join(process.cwd(), 'dist/worker.js');
         const worker = fork(workerPath);
 
@@ -37,11 +44,14 @@ const runWorker = (login, password) => {
 };
 
 const main = async () => {
+    await RedisWorker.init();
+
     // Collect all worker promises
     const workerPromises = [];
-    for (const account of config) {
+    for (const account of accounts) {
         for (let i = 0; i < account.proxyThreads; i++) {
             workerPromises.push(runWorker(account.login, account.password));
+            await randomDelay();
         }
     }
 

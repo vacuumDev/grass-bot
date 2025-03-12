@@ -7,6 +7,17 @@ import { IpResponseData } from "../dto/ip-info.dto.js";
 import WebSocket from "ws";
 import { v4 as uuidv4 } from "uuid";
 import ProxyManager from "./proxy-manager.js";
+import fs from "fs";
+
+// Read config from data/config.json and get the delay range.
+const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
+const delayRange: [number, number] = config.delay;
+
+function randomDelay(): Promise<void> {
+    const [min, max] = delayRange;
+    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export default class Grass {
     private accessToken!: string;
@@ -21,29 +32,48 @@ export default class Grass {
     private pingInterval?: NodeJS.Timeout;
     private currentProxyUrl: string;
     private userId!: string;
-    private userAgent: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
+    private userAgent: string =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
 
     constructor() {
-        this.currentProxyUrl = ProxyManager.getProxy() as string;
-        this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
         this.browserId = uuidv4();
-        console.log(this.browserId);
     }
 
     // Log in and set up the axios instance.
     async login(email: string, password: string): Promise<void> {
+        this.currentProxyUrl = await ProxyManager.getProxy() as string;
+        this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
+
         try {
+            if(this.accessToken) {
+                const config: AxiosRequestConfig = {
+                    baseURL: "https://api.getgrass.io",
+                    headers: {
+                        Authorization: this.accessToken,
+                        "User-Agent": this.userAgent,
+                    },
+                    httpsAgent: this.proxy,
+                    httpAgent: this.proxy,
+                    timeout: 20000,
+                };
+
+                this.grassApi = axios.create(config);
+                return;
+            }
+
+            // Add a random delay before making the login request.
+            await randomDelay();
             const res: AxiosResponse<ApiResponseDto<LoginResponseData>> = await axios.post(
-                'https://api.getgrass.io/login',
+                "https://api.getgrass.io/login",
                 {
                     username: email,
                     password,
-                    v: "5.1.1"
+                    v: "5.1.1",
                 },
                 {
                     httpsAgent: this.proxy,
                     httpAgent: this.proxy,
-                    timeout: 20000
+                    timeout: 20000,
                 }
             );
 
@@ -51,14 +81,14 @@ export default class Grass {
             this.refreshToken = res.data.result.data.refreshToken;
 
             const config: AxiosRequestConfig = {
-                baseURL: 'https://api.getgrass.io',
+                baseURL: "https://api.getgrass.io",
                 headers: {
-                    'Authorization': this.accessToken,
-                    'User-Agent': this.userAgent
+                    Authorization: this.accessToken,
+                    "User-Agent": this.userAgent,
                 },
                 httpsAgent: this.proxy,
                 httpAgent: this.proxy,
-                timeout: 20000
+                timeout: 20000,
             };
 
             this.grassApi = axios.create(config);
@@ -75,7 +105,8 @@ export default class Grass {
 
     async getUser(): Promise<UserResponseData> {
         try {
-            const res: AxiosResponse<ApiResponseDto<UserResponseData>> = await this.grassApi.get('/retrieveUser');
+            await randomDelay();
+            const res: AxiosResponse<ApiResponseDto<UserResponseData>> = await this.grassApi.get("/retrieveUser");
             return res.data.result.data;
         } catch (error) {
             console.error("Error retrieving user data:", error);
@@ -86,7 +117,8 @@ export default class Grass {
 
     async getIpInfo(): Promise<IpResponseData> {
         try {
-            const res: AxiosResponse<ApiResponseDto<IpResponseData>> = await this.grassApi.get('/activeIps');
+            await randomDelay();
+            const res: AxiosResponse<ApiResponseDto<IpResponseData>> = await this.grassApi.get("/activeIps");
             return res.data.result.data;
         } catch (error) {
             console.error("Error retrieving IP info:", error);
@@ -96,7 +128,7 @@ export default class Grass {
     }
 
     // Check‑in call similar to the Python version.
-    async checkIn(): Promise<{ destinations: string[], token: string }> {
+    async checkIn(): Promise<{ destinations: string[]; token: string }> {
         try {
             const data = {
                 browserId: this.browserId,
@@ -104,14 +136,14 @@ export default class Grass {
                 version: "5.1.1",
                 extensionId: "ilehaonighjijnmpnagapkhpcdbhclfg",
                 userAgent: this.userAgent,
-                deviceType: "extension"
+                deviceType: "extension",
             };
-            const res = await axios.post('https://director.getgrass.io/checkin', data, {
+            await randomDelay();
+            const res = await axios.post("https://director.getgrass.io/checkin", data, {
                 httpsAgent: this.proxy,
                 httpAgent: this.proxy,
-                timeout: 20000
+                timeout: 20000,
             });
-            console.log(res.data);
             const responseData = res.data;
             if (!responseData.destinations || responseData.destinations.length === 0) {
                 throw new Error("No destinations returned from checkIn");
@@ -132,19 +164,17 @@ export default class Grass {
         this.ws = new WebSocket(wsUrl, { agent: this.proxy });
 
         this.ws.on("open", () => {
-            console.log("Connected to WebSocket server");
             this.sendPing();
-            // Start periodic tasks: sending ping and checking score every minute.
+            // Start periodic tasks: sending ping and checking score.
             this.startPeriodicTasks();
         });
 
         this.ws.on("message", async (data: WebSocket.Data) => {
             const messageStr = data.toString();
-            console.log("Received message:", messageStr);
+            console.log('Received message', messageStr);
             try {
                 const message = JSON.parse(messageStr);
                 if (message.action === "HTTP_REQUEST") {
-                    console.log(`Processing HTTP_REQUEST with id: ${message.id}`);
                     const requestUrl = message.data.url;
                     try {
                         const result = await this.performHttpRequest(requestUrl);
@@ -154,7 +184,6 @@ export default class Grass {
                             result: result,
                         };
                         this.sendMessage(responseMessage);
-                        console.log(`Sent HTTP_REQUEST response for id: ${message.id}`);
                     } catch (err) {
                         console.error("Error during HTTP_REQUEST:", err);
                     }
@@ -162,16 +191,13 @@ export default class Grass {
                     // Respond to PING messages with a PONG.
                     const pongResponse = {
                         id: message.id,
-                        origin_action: "PONG"
+                        origin_action: "PONG",
                     };
                     this.sendMessage(pongResponse);
-                    console.log(`Sent PONG response for id: ${message.id}`);
                 } else if (message.action === "PONG") {
-                    console.log(`Received PONG message with id: ${message.id}`);
                 } else if (message.action === "MINING_REWARD") {
                     // Handle mining reward messages (if available).
                     const points = message.data?.points || 0;
-                    console.log(`Received MINING_REWARD: +${points} points`);
                     // Optionally update total points by calling getUser or a dedicated endpoint.
                 }
             } catch (err) {
@@ -208,11 +234,10 @@ export default class Grass {
                     timestamp: Math.floor(Date.now() / 1000),
                     device_type: "extension",
                     version: "5.1.1",
-                    extension_id: "ilehaonighjijnmpnagapkhpcdbhclfg"
-                }
+                    extension_id: "ilehaonighjijnmpnagapkhpcdbhclfg",
+                },
             };
             this.ws.send(JSON.stringify(browserInfo));
-            console.log("Sent browser info");
         }
     }
 
@@ -224,7 +249,7 @@ export default class Grass {
                 id: pingId,
                 version: "1.0.0",
                 action: "PING",
-                data: {}
+                data: {},
             };
             this.ws.send(JSON.stringify(pingMessage));
             this.pingCount++;
@@ -244,10 +269,11 @@ export default class Grass {
     // Perform an HTTP GET request and return the response (with Base64‑encoded body).
     async performHttpRequest(url: string): Promise<any> {
         try {
+            await randomDelay();
             const response = await axios.get(url, {
                 httpAgent: this.proxy,
                 httpsAgent: this.proxy,
-                timeout: 20000
+                timeout: 20000,
             });
             const encodedBody = Buffer.from(JSON.stringify(response.data)).toString("base64");
             const headersObj: Record<string, string> = {};
@@ -271,9 +297,9 @@ export default class Grass {
     // Check the mining score by calling the /activeDevices endpoint.
     async checkMiningScore(): Promise<boolean> {
         try {
-            const res = await this.grassApi.get('/activeDevices', { timeout: 20000 });
+            await randomDelay();
+            const res = await this.grassApi.get("/activeDevices", { timeout: 20000 });
             const devices = res.data.result.data;
-            console.log('Devices:', devices);
             const device = devices.find((d: any) => d.deviceId === this.browserId);
 
             let currentScore = 0;
@@ -308,7 +334,7 @@ export default class Grass {
         }
     }
 
-    // Start periodic tasks: sending pings and checking score every minute.
+    // Start periodic tasks: sending pings and checking score.
     startPeriodicTasks(): void {
         this.stopPeriodicTasks();
         this.pingInterval = setInterval(() => {
@@ -342,17 +368,17 @@ export default class Grass {
     // Change to a new proxy using the ProxyManager.
     async changeProxy(): Promise<void> {
         console.log("Changing proxy...");
-        this.currentProxyUrl = ProxyManager.getProxy() as string;
+        this.currentProxyUrl = await ProxyManager.getProxy() as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
         const config: AxiosRequestConfig = {
-            baseURL: 'https://api.getgrass.io',
+            baseURL: "https://api.getgrass.io",
             headers: {
-                'Authorization': this.accessToken,
-                'User-Agent': this.userAgent
+                Authorization: this.accessToken,
+                "User-Agent": this.userAgent,
             },
             httpsAgent: this.proxy,
             httpAgent: this.proxy,
-            timeout: 20000
+            timeout: 20000,
         };
         this.grassApi = axios.create(config);
         console.log(`Proxy changed to: ${this.currentProxyUrl}`);
@@ -368,6 +394,8 @@ export default class Grass {
     // Attempt to reconnect the WebSocket with a new proxy.
     async reconnect(): Promise<void> {
         console.log("Reconnecting WebSocket with new proxy...");
+        this.browserId = uuidv4();
+        await randomDelay();
         await this.changeProxy();
         try {
             const { destinations, token } = await this.checkIn();
