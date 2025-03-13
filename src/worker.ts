@@ -8,7 +8,9 @@ const processGrassAccount = async (login: string, password: string, proxyThreads
     const user = await grass.getUser();
     console.log('User info:', user);
     // Pass proxyThreads to your startMining method if it uses it
-    await grass.startMining(login, password, proxyThreads);
+    for (let i = 0; i < proxyThreads; i++) {
+        await grass.startMining(login, password);
+    }
     // Prevent the worker from exiting immediately (if needed)
     await new Promise(() => {});
 };

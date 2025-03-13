@@ -444,8 +444,11 @@ export default class Grass {
     async startMining(email: string, password: string): Promise<void> {
         try {
             await this.login(email, password);
+            await randomDelay();
             const { destinations, token } = await this.checkIn();
+            await randomDelay();
             this.connectWebSocket(destinations[0] as string, token);
+            await randomDelay();
         } catch (error) {
             console.error("Error starting mining:", error);
         }
