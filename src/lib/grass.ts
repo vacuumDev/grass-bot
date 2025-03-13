@@ -177,7 +177,6 @@ export default class Grass {
         } catch (error) {
             console.error("Error during checkIn:", error);
             await this.reconnect();
-            throw error;
         }
     }
 
@@ -295,6 +294,7 @@ export default class Grass {
             this.ws.send(JSON.stringify(message));
         } else {
             console.error("WebSocket is not open. Cannot send message.");
+            this.reconnect()
         }
     }
 

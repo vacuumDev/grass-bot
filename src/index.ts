@@ -2,23 +2,23 @@ import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import RedisWorker from "./lib/redis-worker.js";
-import GrassMiner from "./lib/grass";
 
 // Read and parse configuration
-const accounts = JSON.parse(fs.readFileSync('data/config.json', 'utf-8')).accounts;
+const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
+const accounts = config.accounts;
 console.log('Loaded config:', accounts);
 
+// Delay range from config if needed
+const [minDelay, maxDelay] = config.delay || [100, 10000];
+
 function randomDelay(): Promise<void> {
-    const min = 100;
-    const max = 10000;
-    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+    const ms = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Function to run a worker process for given credentials
-const runWorker = (login: string, password: string) => {
+// Function to run a worker process for given credentials and thread count
+const runWorker = (login: string, password: string, threads: number) => {
     return new Promise((resolve, reject) => {
-        // Resolve the absolute path to worker.js
         const workerPath = path.join(process.cwd(), 'dist/worker.js');
         const worker = fork(workerPath);
 
@@ -39,19 +39,24 @@ const runWorker = (login: string, password: string) => {
             }
         });
 
-        // Send the login and password to the worker
-        worker.send({ login, password });
+        // Send login, password and thread count to the worker
+        worker.send({ login, password, proxyThreads: threads });
     });
 };
 
 const main = async () => {
     await RedisWorker.init();
 
-    // Collect all worker promises
+    // For each account, spawn enough workers so each worker gets 20 threads.
     const workerPromises = [];
     for (const account of accounts) {
-        for (let i = 0; i < account.proxyThreads; i++) {
-            workerPromises.push(runWorker(account.login, account.password));
+        const { login, password, proxyThreads } = account;
+        // Determine the number of workers needed (each handling 20 threads)
+        const numWorkers = Math.ceil(proxyThreads / 20);
+        for (let i = 0; i < numWorkers; i++) {
+            // For now we pass 20 threads to each worker.
+            // Optionally, for the last worker you could pass a smaller number if (proxyThreads % 20 !== 0)
+            workerPromises.push(runWorker(login, password, 20));
             await randomDelay();
         }
     }

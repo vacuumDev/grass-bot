@@ -3,7 +3,7 @@
     {
       "login": "eiv92466@bcooq.com",
       "password": "eiv92466@bcooq.com!A",
-      "proxyThreads": 200
+      "proxyThreads": 100
     }
  ],
   "delay": [100, 600],
