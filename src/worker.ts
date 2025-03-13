@@ -3,12 +3,8 @@ import RedisWorker from "./lib/redis-worker.js";
 
 const processGrassAccount = async (login: string, password: string, proxyThreads: number) => {
     await RedisWorker.init();
-    const grass = new Grass();
-    await grass.login(login, password);
-    const user = await grass.getUser();
-    console.log('User info:', user);
-    // Pass proxyThreads to your startMining method if it uses it
     for (let i = 0; i < proxyThreads; i++) {
+        const grass = new Grass();
         await grass.startMining(login, password);
     }
     // Prevent the worker from exiting immediately (if needed)
