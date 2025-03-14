@@ -9,10 +9,9 @@ export default class ProxyManager {
         if(config.useRotatingProxy)
             return config.rotatingProxy;
 
+        let index = await RedisWorker.getIndex();
 
-        let index = await RedisWorker.getNext();
-
-        if(proxies.length < index)
+        if (index >= proxies.length)
             await RedisWorker.resetIndex();
 
         index = await RedisWorker.getNext();
