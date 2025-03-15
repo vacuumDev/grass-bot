@@ -1,7 +1,7 @@
-import redis, {RedisClientType} from 'redis';
+import redis from 'redis';
 
 class RedisWorker {
-    static client: RedisClientType;
+    static client: any;
     static async init() {
         const client = redis.createClient({
             socket: {

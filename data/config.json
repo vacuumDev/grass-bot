@@ -1,12 +1,11 @@
 {
  "accounts": [
     {
-      "login": "eiv92466@bcooq.com",
-      "password": "eiv92466@bcooq.com!A",
+      "login": "ykseilbjln@rambler.ru",
+      "password": "11000345Gcoyz!",
       "proxyThreads": 100
     }
  ],
   "delay": [100, 600],
-  "useRotatingProxy": false,
-  "rotatingProxy": ""
+  "rotatingProxy": "http://maddnivan_gmail_com-country-any-filter-medium:hy9o97m71v@gate.nodemaven.com:8080"
 }

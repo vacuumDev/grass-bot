@@ -5,8 +5,8 @@ const proxies = fs.readFileSync('data/proxies.txt').toString().split('\n');
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
 
 export default class ProxyManager {
-    static async getProxy(): Promise<string> {
-        if(config.useRotatingProxy)
+    static async getProxy(useRotatingProxy = false): Promise<string> {
+        if(useRotatingProxy)
             return config.rotatingProxy;
 
         let index = await RedisWorker.getIndex();

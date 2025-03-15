@@ -52,11 +52,11 @@ const main = async () => {
     for (const account of accounts) {
         const { login, password, proxyThreads } = account;
         // Determine the number of workers needed (each handling 20 threads)
-        const numWorkers = Math.ceil(proxyThreads / 20);
+        const numWorkers = Math.ceil(proxyThreads / 40);
         for (let i = 0; i < numWorkers; i++) {
             // For now we pass 20 threads to each worker.
             // Optionally, for the last worker you could pass a smaller number if (proxyThreads % 20 !== 0)
-            workerPromises.push(runWorker(login, password, 20));
+            workerPromises.push(runWorker(login, password, 40));
             await randomDelay();
         }
     }

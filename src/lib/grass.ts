@@ -20,6 +20,10 @@ function randomDelay(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const delay = async (ms: number) => {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default class Grass {
     private accessToken!: string;
     private refreshToken!: string;
@@ -31,7 +35,7 @@ export default class Grass {
     private minScoreThreshold: number = 75;
     private scoreCheckInterval?: NodeJS.Timeout;
     private pingInterval?: NodeJS.Timeout;
-    private currentProxyUrl: string;
+    private currentProxyUrl?: string;
     private userId!: string;
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
@@ -97,7 +101,6 @@ export default class Grass {
                     timeout: 20000,
                 }
             );
-
             this.accessToken = res.data.result.data.accessToken;
 
             this.refreshToken = res.data.result.data.refreshToken;
@@ -123,8 +126,7 @@ export default class Grass {
                 userId: this.userId
             }));
         } catch (error) {
-            console.error("Error during login:", error.response.data);
-            process.exit(-1)
+            console.error("Error during login:", error);
         }
     }
 
@@ -176,16 +178,17 @@ export default class Grass {
             return { destinations: responseData.destinations, token: responseData.token };
         } catch (error) {
             console.error("Error during checkIn:", error);
-            await this.reconnect();
+            throw new Error("No destinations returned from checkIn")
         }
     }
 
     /**
      * Opens a WebSocket connection using the destination and token from check‑in.
      */
-    connectWebSocket(destination: string, token: string): void {
+    async connectWebSocket(destination: string, token: string): Promise<void> {
         const wsUrl = `ws://${destination}/?token=${token}`;
-        this.ws = new WebSocket(wsUrl, { agent: this.proxy });
+        const rotatingProxy = await ProxyManager.getProxy(true);
+        this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
             this.sendPing();
@@ -243,12 +246,12 @@ export default class Grass {
             await this.reconnect();
         });
 
-        this.ws.on("close", (code: number, reason: Buffer) => {
+        this.ws.on("close", async (code: number, reason: Buffer) => {
             console.log(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
             // Stop periodic tasks.
             this.stopPeriodicTasks();
             // Attempt reconnection with a new proxy.
-            this.reconnect();
+            await this.reconnect();
         });
     }
 
@@ -431,12 +434,11 @@ export default class Grass {
         await this.changeProxy();
         try {
             const { destinations, token } = await this.checkIn();
-            this.connectWebSocket(destinations[0] as string, token);
+            await this.connectWebSocket(destinations[0] as string, token);
         } catch (error) {
             console.error("Reconnection failed:", error);
-            setTimeout(() => {
-                this.reconnect();
-            }, 10000);
+            await delay(60_000);
+            await this.reconnect();
         }
     }
 
@@ -444,10 +446,16 @@ export default class Grass {
     async startMining(email: string, password: string): Promise<void> {
         try {
             await this.login(email, password);
+        } catch (err) {
+            console.error(`Can not login to ${email} ${password}`);
+            console.log(err)
+            return;
+        }
+        try {
             await randomDelay();
             const { destinations, token } = await this.checkIn();
             await randomDelay();
-            this.connectWebSocket(destinations[0] as string, token);
+            await this.connectWebSocket(destinations[0] as string, token);
             await randomDelay();
         } catch (error) {
             console.error("Error starting mining:", error);
