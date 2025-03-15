@@ -166,9 +166,10 @@ export default class Grass {
                 deviceType: "extension",
             };
             await randomDelay();
+            const rotatingProxy = await ProxyManager.getProxy(true);
             const res = await axios.post("https://director.getgrass.io/checkin", data, {
-                httpsAgent: this.proxy,
-                httpAgent: this.proxy,
+                httpsAgent: new HttpsProxyAgent(rotatingProxy),
+                httpAgent: new HttpsProxyAgent(rotatingProxy),
                 timeout: 20000,
             });
             const responseData = res.data;
