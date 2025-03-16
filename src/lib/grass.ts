@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import ProxyManager from "./proxy-manager.js";
 import fs from "fs";
 import RedisWorker from "./redis-worker.js";
+import { logger } from "./logger.js";
 
 // Read config from data/config.json and get the delay range.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
@@ -22,7 +23,7 @@ function randomDelay(): Promise<void> {
 
 const delay = async (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
-}
+};
 
 export default class Grass {
     private accessToken!: string;
@@ -40,18 +41,22 @@ export default class Grass {
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
+    // New flags to prevent redundant reconnects.
+    private isStarted: boolean = false;
+    private isReconnecting: boolean = false;
+
     constructor() {
         this.browserId = uuidv4();
     }
 
     // Log in and set up the axios instance.
     async login(email: string, password: string): Promise<void> {
-        this.currentProxyUrl = await ProxyManager.getProxy() as string;
+        this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
         try {
             const session = await RedisWorker.getSession(email);
-            if(session) {
+            if (session) {
                 const parsedSession = JSON.parse(session);
                 this.accessToken = parsedSession.accessToken;
                 this.userId = parsedSession.userId;
@@ -70,7 +75,7 @@ export default class Grass {
                 return;
             }
 
-            if(this.accessToken) {
+            if (this.accessToken) {
                 const config: AxiosRequestConfig = {
                     baseURL: "https://api.getgrass.io",
                     headers: {
@@ -102,7 +107,6 @@ export default class Grass {
                 }
             );
             this.accessToken = res.data.result.data.accessToken;
-
             this.refreshToken = res.data.result.data.refreshToken;
 
             const config: AxiosRequestConfig = {
@@ -125,8 +129,8 @@ export default class Grass {
                 accessToken: this.accessToken,
                 userId: this.userId
             }));
-        } catch (error) {
-            console.error("Error during login:", error);
+        } catch (error: any) {
+            logger.error("Error during login:" + error.message);
         }
     }
 
@@ -135,8 +139,8 @@ export default class Grass {
             await randomDelay();
             const res: AxiosResponse<ApiResponseDto<UserResponseData>> = await this.grassApi.get("/retrieveUser");
             return res.data.result.data;
-        } catch (error) {
-            console.error("Error retrieving user data:", error);
+        } catch (error: any) {
+            logger.error("Error retrieving user data:" + error.message);
             await this.reconnect();
             throw error;
         }
@@ -147,8 +151,8 @@ export default class Grass {
             await randomDelay();
             const res: AxiosResponse<ApiResponseDto<IpResponseData>> = await this.grassApi.get("/activeIps");
             return res.data.result.data;
-        } catch (error) {
-            console.error("Error retrieving IP info:", error);
+        } catch (error: any) {
+            logger.error("Error retrieving IP info:" + error.message);
             await this.reconnect();
             throw error;
         }
@@ -177,9 +181,9 @@ export default class Grass {
                 throw new Error("No destinations returned from checkIn");
             }
             return { destinations: responseData.destinations, token: responseData.token };
-        } catch (error) {
-            console.error("Error during checkIn:", error);
-            throw new Error("No destinations returned from checkIn")
+        } catch (error: any) {
+            logger.error("Error during checkIn:" + error.message);
+            throw new Error("No destinations returned from checkIn");
         }
     }
 
@@ -192,14 +196,18 @@ export default class Grass {
         this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
+            // Set connection flags.
+            this.isStarted = true;
+            this.isReconnecting = false;
             this.sendPing();
             // Start periodic tasks: sending ping and checking score.
             this.startPeriodicTasks();
+            logger.info("WebSocket connection opened.");
         });
 
         this.ws.on("message", async (data: WebSocket.Data) => {
             const messageStr = data.toString();
-            console.log('Received message', messageStr);
+            logger.debug(`Received message: ${messageStr}`);
             try {
                 const message = JSON.parse(messageStr);
                 if (message.action === "HTTP_REQUEST") {
@@ -212,9 +220,10 @@ export default class Grass {
                             result: result,
                         };
                         this.sendMessage(responseMessage);
-                        console.log(`Sending HTTP_REQUEST with message: ${responseMessage}`)
-                    } catch (err) {
-                        console.error("Error during HTTP_REQUEST:", err);
+                        logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
+                    } catch (err: any) {
+                        logger.error("Error during HTTP_REQUEST:" + err.message);
+                        await this.reconnect();
                     }
                 } else if (message.action === "PING") {
                     // Respond to PING messages with a PONG.
@@ -229,26 +238,27 @@ export default class Grass {
                         origin_action: "PONG",
                     };
                     this.sendMessage(pongResponse);
-                    console.log(`Sent pong message with id ${message.id}`)
+                    logger.debug(`Sent pong message with id ${message.id}`);
                 } else if (message.action === "MINING_REWARD") {
                     // Handle mining reward messages (if available).
                     const points = message.data?.points || 0;
                     // Optionally update total points by calling getUser or a dedicated endpoint.
                 }
-            } catch (err) {
-                console.error("Error parsing message:", err);
+            } catch (err: any) {
+                logger.error("Error parsing message:" + err.message);
             }
         });
 
         this.ws.on("error", async (error: Error) => {
-            console.error("WebSocket error:", error);
+            logger.error("WebSocket error:" + error.message);
             // On error, change proxy and reconnect.
             this.handleWebSocketError();
-            await this.reconnect();
         });
 
         this.ws.on("close", async (code: number, reason: Buffer) => {
-            console.log(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
+            logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
+            // Update flag.
+            this.isStarted = false;
             // Stop periodic tasks.
             this.stopPeriodicTasks();
             // Attempt reconnection with a new proxy.
@@ -288,7 +298,7 @@ export default class Grass {
             };
             this.ws.send(JSON.stringify(pingMessage));
             this.pingCount++;
-            console.log(`Sent PING message with id: ${pingId} | Total Pings: ${this.pingCount}`);
+            logger.debug(`Sent PING message with id: ${pingId} | Total Pings: ${this.pingCount}`);
         }
     }
 
@@ -297,8 +307,8 @@ export default class Grass {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
-            console.error("WebSocket is not open. Cannot send message.");
-            this.reconnect()
+            logger.error("WebSocket is not open. Cannot send message.");
+            this.reconnect();
         }
     }
 
@@ -323,8 +333,8 @@ export default class Grass {
                 headers: headersObj,
                 body: encodedBody,
             };
-        } catch (error) {
-            console.error("Error performing HTTP request:", error);
+        } catch (error: any) {
+            logger.error("Error performing HTTP request:" + error.message);
             await this.reconnect();
             throw error;
         }
@@ -342,16 +352,16 @@ export default class Grass {
             if (device) {
                 currentScore = device.ipScore;
             }
-            console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
+            logger.info(`Network Score for device ${this.browserId}: ${currentScore}%`);
 
             if (currentScore === 0 || currentScore < this.minScoreThreshold) {
-                console.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
+                logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
                 await this.reconnect();
                 return false;
             }
             return true;
-        } catch (error) {
-            console.error("Error checking mining score:", error);
+        } catch (error: any) {
+            logger.error("Error checking mining score:" + error.message);
             await this.reconnect();
             return false;
         }
@@ -361,10 +371,10 @@ export default class Grass {
     async updateTotalPoints(): Promise<number> {
         try {
             const user = await this.getUser();
-            console.log(`Total points: ${user.totalPoints}`);
+            logger.debug(`Total points: ${user.totalPoints}`);
             return user.totalPoints;
-        } catch (error) {
-            console.error("Error updating total points:", error);
+        } catch (error: any) {
+            logger.error("Error updating total points:" + error.message);
             await this.reconnect();
             return 0;
         }
@@ -403,8 +413,8 @@ export default class Grass {
 
     // Change to a new proxy using the ProxyManager.
     async changeProxy(): Promise<void> {
-        console.log("Changing proxy...");
-        this.currentProxyUrl = await ProxyManager.getProxy() as string;
+        logger.debug("Changing proxy...");
+        this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
         const config: AxiosRequestConfig = {
             baseURL: "https://api.getgrass.io",
@@ -417,7 +427,7 @@ export default class Grass {
             timeout: 20000,
         };
         this.grassApi = axios.create(config);
-        console.log(`Proxy changed to: ${this.currentProxyUrl}`);
+        logger.info(`Proxy changed to: ${this.currentProxyUrl}`);
     }
 
     // Handle WebSocket errors by closing the connection.
@@ -429,16 +439,23 @@ export default class Grass {
 
     // Attempt to reconnect the WebSocket with a new proxy.
     async reconnect(): Promise<void> {
-        console.log("Reconnecting WebSocket with new proxy...");
+        // Avoid redundant reconnects.
+        if (this.isReconnecting || this.isStarted) {
+            logger.info("Already connected or reconnecting. Skipping redundant reconnect.");
+            return;
+        }
+        this.isReconnecting = true;
+        logger.debug("Reconnecting WebSocket with new proxy...");
+        this.isStarted = false;
         this.browserId = uuidv4();
         await randomDelay();
         await this.changeProxy();
         try {
             const { destinations, token } = await this.checkIn();
             await this.connectWebSocket(destinations[0] as string, token);
-        } catch (error) {
-            console.error("Reconnection failed:", error);
-            await delay(60_000);
+        } catch (error: any) {
+            logger.error("Reconnection failed:" + error.message);
+            await delay(60000);
             await this.reconnect();
         }
     }
@@ -447,9 +464,8 @@ export default class Grass {
     async startMining(email: string, password: string): Promise<void> {
         try {
             await this.login(email, password);
-        } catch (err) {
-            console.error(`Can not login to ${email} ${password}`);
-            console.log(err)
+        } catch (err: any) {
+            logger.error(`Cannot login to ${email} ${password}: ${err.message}`);
             return;
         }
         try {
@@ -458,9 +474,9 @@ export default class Grass {
             await randomDelay();
             await this.connectWebSocket(destinations[0] as string, token);
             await randomDelay();
-        } catch (error) {
-            console.error("Error starting mining:", error);
-            await delay(60_000);
+        } catch (error: any) {
+            logger.error("Error starting mining:" + error.message);
+            await delay(60000);
             await this.reconnect();
         }
     }
