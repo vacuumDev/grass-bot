@@ -18,6 +18,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "@pm2/io": "^6.1.0",
     "axios": "^1.8.1",
     "dotenv": "^16.4.7",
     "https-proxy-agent": "^7.0.6",

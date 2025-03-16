@@ -2,6 +2,14 @@ import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import RedisWorker from "./lib/redis-worker.js";
+import io from '@pm2/io';
+
+io.init({
+    metrics: {
+        http: true,
+    }
+});
+
 
 // Read and parse configuration
 const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
@@ -52,11 +60,11 @@ const main = async () => {
     for (const account of accounts) {
         const { login, password, proxyThreads } = account;
         // Determine the number of workers needed (each handling 20 threads)
-        const numWorkers = Math.ceil(proxyThreads / 40);
+        const numWorkers = Math.ceil(proxyThreads / 100);
         for (let i = 0; i < numWorkers; i++) {
             // For now we pass 20 threads to each worker.
             // Optionally, for the last worker you could pass a smaller number if (proxyThreads % 20 !== 0)
-            workerPromises.push(runWorker(login, password, 40));
+            workerPromises.push(runWorker(login, password, 100));
             await randomDelay();
         }
     }
