@@ -460,6 +460,7 @@ export default class Grass {
             await randomDelay();
         } catch (error) {
             console.error("Error starting mining:", error);
+            await delay(60_000);
             await this.reconnect();
         }
     }
