@@ -41,9 +41,6 @@ export default class Grass {
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
-    // New flags to prevent redundant reconnects.
-    private isStarted: boolean = false;
-    private isReconnecting: boolean = false;
 
     constructor() {
         this.browserId = uuidv4();
@@ -197,8 +194,6 @@ export default class Grass {
 
         this.ws.on("open", () => {
             // Set connection flags.
-            this.isStarted = true;
-            this.isReconnecting = false;
             this.sendPing();
             // Start periodic tasks: sending ping and checking score.
             this.startPeriodicTasks();
@@ -258,7 +253,6 @@ export default class Grass {
         this.ws.on("close", async (code: number, reason: Buffer) => {
             logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
             // Update flag.
-            this.isStarted = false;
             // Stop periodic tasks.
             this.stopPeriodicTasks();
             // Attempt reconnection with a new proxy.
@@ -439,14 +433,7 @@ export default class Grass {
 
     // Attempt to reconnect the WebSocket with a new proxy.
     async reconnect(): Promise<void> {
-        // Avoid redundant reconnects.
-        if (this.isReconnecting || this.isStarted) {
-            logger.info("Already connected or reconnecting. Skipping redundant reconnect.");
-            return;
-        }
-        this.isReconnecting = true;
         logger.debug("Reconnecting WebSocket with new proxy...");
-        this.isStarted = false;
         this.browserId = uuidv4();
         await randomDelay();
         await this.changeProxy();
