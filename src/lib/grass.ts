@@ -434,6 +434,8 @@ export default class Grass {
     // Attempt to reconnect the WebSocket with a new proxy.
     async reconnect(): Promise<void> {
         logger.debug("Reconnecting WebSocket with new proxy...");
+        this.handleWebSocketError();
+        this.stopPeriodicTasks();
         this.browserId = uuidv4();
         await randomDelay();
         await this.changeProxy();
