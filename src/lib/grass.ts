@@ -216,10 +216,21 @@ export default class Grass {
                         this.sendMessage(responseMessage);
                         logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                     } catch (err: any) {
-                        logger.error("Error during HTTP_REQUEST:" + err.message);
-                        await this.changeProxy();
-                        this.ws?.close();
-                        return;
+                        try {
+                            const result = await this.performHttpRequest(requestUrl);
+                            const responseMessage = {
+                                id: message.id,
+                                origin_action: message.action,
+                                result: result,
+                            };
+                            this.sendMessage(responseMessage);
+                            logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
+                        } catch (err: any) {
+                            logger.error("Error during HTTP_REQUEST:" + err.message);
+                            await this.changeProxy();
+                            this.ws?.close();
+                            return;
+                        }
                     }
                 } else if (message.action === "PING") {
                     // Respond to PING messages with a PONG.
