@@ -433,7 +433,6 @@ export default class Grass {
         await randomDelay();
 
         if(needProxyChange) {
-            logger.debug("Reconnecting WebSocket with new proxy...");
             await this.changeProxy();
         }
         try {
