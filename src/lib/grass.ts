@@ -213,7 +213,7 @@ export default class Grass {
                             origin_action: message.action,
                             result: result,
                         };
-                        this.sendMessage(responseMessage);
+                        await this.sendMessage(responseMessage);
                         logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                     } catch (err: any) {
                         try {
@@ -223,7 +223,7 @@ export default class Grass {
                                 origin_action: message.action,
                                 result: result,
                             };
-                            this.sendMessage(responseMessage);
+                            await this.sendMessage(responseMessage);
                             logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                         } catch (err: any) {
                             logger.error("Error during HTTP_REQUEST:" + err.message);
@@ -238,13 +238,13 @@ export default class Grass {
                         id: message.id,
                         origin_action: "PONG",
                     };
-                    this.sendMessage(pongResponse);
+                    await this.sendMessage(pongResponse);
                 } else if (message.action === "PONG") {
                     const pongResponse = {
                         id: message.id,
                         origin_action: "PONG",
                     };
-                    this.sendMessage(pongResponse);
+                    await this.sendMessage(pongResponse);
                     logger.debug(`Sent pong message with id ${message.id}`);
                 } else if (message.action === "MINING_REWARD") {
                     // Handle mining reward messages (if available).
@@ -309,12 +309,12 @@ export default class Grass {
     }
 
     // Send an arbitrary message over the WebSocket.
-    sendMessage(message: any): void {
+    async sendMessage(message: any): Promise<void> {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
             logger.error("WebSocket is not open. Cannot send message.");
-            this.reconnect();
+            await this.reconnect();
         }
     }
 
