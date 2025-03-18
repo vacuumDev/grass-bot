@@ -217,7 +217,9 @@ export default class Grass {
                         logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                     } catch (err: any) {
                         logger.error("Error during HTTP_REQUEST:" + err.message);
-                        await this.reconnect();
+                        await this.changeProxy();
+                        this.ws?.close();
+                        return;
                     }
                 } else if (message.action === "PING") {
                     // Respond to PING messages with a PONG.
@@ -328,7 +330,6 @@ export default class Grass {
             };
         } catch (error: any) {
             logger.error("Error performing HTTP request:" + error.message);
-            await this.reconnect(true);
             throw error;
         }
     }
