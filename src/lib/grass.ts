@@ -138,7 +138,7 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving user data:" + error.message);
-            await this.reconnect();
+            await this.reconnect(true);
             throw error;
         }
     }
@@ -150,7 +150,7 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving IP info:" + error.message);
-            await this.reconnect();
+            await this.reconnect(true);
             throw error;
         }
     }
@@ -329,7 +329,7 @@ export default class Grass {
             };
         } catch (error: any) {
             logger.error("Error performing HTTP request:" + error.message);
-            await this.reconnect();
+            await this.reconnect(true);
             throw error;
         }
     }
@@ -338,15 +338,19 @@ export default class Grass {
     async checkMiningScore(): Promise<boolean> {
         try {
             await randomDelay();
-            const res = await this.grassApi.get("/activeDevices", { timeout: 20000 });
-            const devices = res.data.result.data;
-            const device = devices.find((d: any) => d.deviceId === this.browserId);
+            const res = await this.grassApi.get(`/retrieveDevice?input=%7B%22deviceId%22:%22${this.browserId}%22%7D`, { timeout: 20000 });
+
+            // Find the device where deviceId matches the current browserId
+            const device = res.data.result.data;
+            logger.debug('Devices: ' + JSON.stringify(device));
 
             let currentScore = 0;
             if (device) {
+                // Get ipScore as the network score
                 currentScore = device.ipScore;
             }
-            logger.info(`Network Score for device ${this.browserId}: ${currentScore}%`);
+            console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
+
 
             if (currentScore === 0 || currentScore < this.minScoreThreshold) {
                 logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
@@ -356,20 +360,18 @@ export default class Grass {
             return true;
         } catch (error: any) {
             logger.error("Error checking mining score:" + error.message);
-            await this.reconnect();
+            await this.reconnect(true);
             return false;
         }
     }
 
     // Update the total points by calling the getUser endpoint.
-    async updateTotalPoints(): Promise<number> {
+    async updateTotalPoints() {
         try {
-            const user = await this.getUser();
-            logger.debug(`Total points: ${user.totalPoints}`);
-            return user.totalPoints;
+            logger.debug(`Update points for later statistics`);
         } catch (error: any) {
             logger.error("Error updating total points:" + error.message);
-            await this.reconnect();
+            await this.reconnect(true);
             return 0;
         }
     }
@@ -432,12 +434,15 @@ export default class Grass {
     }
 
     // Attempt to reconnect the WebSocket with a new proxy.
-    async reconnect(): Promise<void> {
-        logger.debug("Reconnecting WebSocket with new proxy...");
+    async reconnect(needProxyChange = false): Promise<void> {
         this.stopPeriodicTasks();
         this.browserId = uuidv4();
         await randomDelay();
-        await this.changeProxy();
+
+        if(needProxyChange) {
+            logger.debug("Reconnecting WebSocket with new proxy...");
+            await this.changeProxy();
+        }
         try {
             const { destinations, token } = await this.checkIn();
             await this.connectWebSocket(destinations[0] as string, token);
