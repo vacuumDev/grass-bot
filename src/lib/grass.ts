@@ -39,7 +39,8 @@ export default class Grass {
     private userId!: string;
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
-
+    // Flag to prevent multiple reconnects
+    private isReconnecting: boolean = false;
 
     constructor() {
         this.browserId = uuidv4();
@@ -127,6 +128,7 @@ export default class Grass {
             }));
         } catch (error: any) {
             logger.error("Error during login:" + error.message);
+            throw error;
         }
     }
 
@@ -137,7 +139,8 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving user data:" + error.message);
-            await this.reconnect(true);
+            // Trigger reconnect if needed
+            await this.triggerReconnect(true);
             throw error;
         }
     }
@@ -149,7 +152,7 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving IP info:" + error.message);
-            await this.reconnect(true);
+            await this.triggerReconnect(true);
             throw error;
         }
     }
@@ -227,7 +230,7 @@ export default class Grass {
                             logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                         } catch (err: any) {
                             logger.error("Error during HTTP_REQUEST:" + err.message);
-                            await this.changeProxy();
+                            await this.triggerReconnect();
                             this.ws?.close();
                             return;
                         }
@@ -258,17 +261,16 @@ export default class Grass {
 
         this.ws.on("error", async (error: Error) => {
             logger.error("WebSocket error:" + error.message);
-            // On error, change proxy and reconnect.
+            // Close socket; the "close" event will handle reconnection.
             this.handleWebSocketError();
         });
 
         this.ws.on("close", async (code: number, reason: Buffer) => {
             logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
-            // Update flag.
             // Stop periodic tasks.
             this.stopPeriodicTasks();
-            // Attempt reconnection with a new proxy.
-            await this.reconnect();
+            // Trigger a reconnect if not already in progress.
+            await this.triggerReconnect();
         });
     }
 
@@ -314,7 +316,7 @@ export default class Grass {
             this.ws.send(JSON.stringify(message));
         } else {
             logger.error("WebSocket is not open. Cannot send message.");
-            await this.reconnect();
+            await this.triggerReconnect();
         }
     }
 
@@ -362,7 +364,6 @@ export default class Grass {
             }
             console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
 
-
             if (currentScore === 0 || currentScore < this.minScoreThreshold) {
                 logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
                 return false;
@@ -370,7 +371,7 @@ export default class Grass {
             return true;
         } catch (error: any) {
             logger.error("Error checking mining score:" + error.message);
-            await this.reconnect(true);
+            await this.triggerReconnect(true);
             return false;
         }
     }
@@ -381,7 +382,7 @@ export default class Grass {
             logger.debug(`Update points for later statistics`);
         } catch (error: any) {
             logger.error("Error updating total points:" + error.message);
-            await this.reconnect(true);
+            await this.triggerReconnect(true);
             return 0;
         }
     }
@@ -393,6 +394,7 @@ export default class Grass {
             await randomDelay();
             this.sendPing();
         }, 60000);
+        // Check mining score periodically. Adjust the interval as needed.
         setTimeout(async () => {
             await randomDelay();
             const scoreOk = await this.checkMiningScore();
@@ -401,7 +403,7 @@ export default class Grass {
                 if (this.ws) {
                     this.ws.close();
                 }
-                await this.reconnect();
+                await this.triggerReconnect();
             }
         }, 180_000 * 10);
     }
@@ -440,22 +442,34 @@ export default class Grass {
         }
     }
 
-    // Attempt to reconnect the WebSocket with a new proxy.
-    async reconnect(needProxyChange = false): Promise<void> {
+    /**
+     * Trigger a reconnect if one is not already in progress.
+     * This method centralizes the reconnection logic.
+     */
+    async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
+        if (this.isReconnecting) {
+            logger.debug("Already reconnecting, skipping new reconnect trigger.");
+            return;
+        }
+        this.isReconnecting = true;
         this.stopPeriodicTasks();
+        // Generate a new browserId for reconnection.
         this.browserId = uuidv4();
         await randomDelay();
 
-        if(needProxyChange) {
+        if (needProxyChange) {
             await this.changeProxy();
         }
         try {
             const { destinations, token } = await this.checkIn();
             await this.connectWebSocket(destinations[0] as string, token);
+            logger.info("Reconnected successfully.");
+            this.isReconnecting = false;
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
             await delay(60000);
-            await this.reconnect();
+            // Retry reconnection. The flag remains true during retries.
+            await this.triggerReconnect(needProxyChange);
         }
     }
 
@@ -476,7 +490,7 @@ export default class Grass {
         } catch (error: any) {
             logger.error("Error starting mining:" + error.message);
             await delay(60000);
-            await this.reconnect();
+            await this.triggerReconnect();
         }
     }
 }
