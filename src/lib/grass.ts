@@ -34,7 +34,6 @@ export default class Grass {
     private browserId: string;
     private pingCount: number = 0;
     private minScoreThreshold: number = 75;
-    private scoreCheckInterval?: NodeJS.Timeout;
     private pingInterval?: NodeJS.Timeout;
     private currentProxyUrl?: string;
     private userId!: string;
@@ -354,7 +353,6 @@ export default class Grass {
 
             if (currentScore === 0 || currentScore < this.minScoreThreshold) {
                 logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
-                await this.reconnect();
                 return false;
             }
             return true;
@@ -382,15 +380,14 @@ export default class Grass {
         this.pingInterval = setInterval(() => {
             this.sendPing();
         }, 60000);
-        this.scoreCheckInterval = setInterval(async () => {
+        setTimeout(async () => {
             const scoreOk = await this.checkMiningScore();
             if (!scoreOk) {
                 this.stopPeriodicTasks();
                 if (this.ws) {
                     this.ws.close();
                 }
-            } else {
-                await this.updateTotalPoints();
+                await this.reconnect();
             }
         }, 180_000 * 10);
     }
@@ -400,10 +397,6 @@ export default class Grass {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
             this.pingInterval = undefined;
-        }
-        if (this.scoreCheckInterval) {
-            clearInterval(this.scoreCheckInterval);
-            this.scoreCheckInterval = undefined;
         }
     }
 
