@@ -389,10 +389,12 @@ export default class Grass {
     // Start periodic tasks: sending pings and checking score.
     startPeriodicTasks(): void {
         this.stopPeriodicTasks();
-        this.pingInterval = setInterval(() => {
+        this.pingInterval = setInterval(async () => {
+            await randomDelay();
             this.sendPing();
         }, 60000);
         setTimeout(async () => {
+            await randomDelay();
             const scoreOk = await this.checkMiningScore();
             if (!scoreOk) {
                 this.stopPeriodicTasks();
