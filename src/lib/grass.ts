@@ -469,6 +469,7 @@ export default class Grass {
             logger.error("Reconnection failed:" + error.message);
             await delay(60000);
             // Retry reconnection. The flag remains true during retries.
+            this.isReconnecting = false;
             await this.triggerReconnect(needProxyChange);
         }
     }
