@@ -195,6 +195,8 @@ export default class Grass {
         this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
+            // Clear the reconnect flag on a successful connection.
+            this.isReconnecting = false;
             // Set connection flags.
             this.sendPing();
             // Start periodic tasks: sending ping and checking score.
