@@ -1,3 +1,4 @@
+// index.ts
 import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -9,6 +10,8 @@ io.init({
         http: true,
     }
 });
+
+const workerStatuses = new Map<string, any>();
 
 
 // Read and parse configuration
@@ -31,8 +34,15 @@ const runWorker = (login: string, password: string, threads: number) => {
         const worker = fork(workerPath);
 
         worker.on('message', (msg) => {
-            console.log(`Worker message for ${login}: ${JSON.stringify(msg)}`);
-            resolve(msg);
+            if (msg.type === 'threadHeartbeat') {
+                const status: any = {
+                    state: msg.state,
+                    lastUpdate: msg.timestamp,
+                    threadId: msg.threadId
+                };
+                workerStatuses.set(msg.workerId, status);
+                console.log(`Received heartbeat from worker ${msg.workerId}: ${msg.state}`);
+            }
         });
 
         worker.on('error', (err) => {
@@ -55,16 +65,15 @@ const runWorker = (login: string, password: string, threads: number) => {
 const main = async () => {
     await RedisWorker.init();
 
-    // For each account, spawn enough workers so each worker gets 20 threads.
+    // For each account, spawn enough workers so each worker gets a set number of threads.
     const workerPromises = [];
     for (const account of accounts) {
         const { login, password, proxyThreads } = account;
-        // Determine the number of workers needed (each handling 20 threads)
+        // Determine the number of workers needed (each handling a fixed number of threads)
         const numWorkers = Math.ceil(proxyThreads / 50);
         for (let i = 0; i < numWorkers; i++) {
-            // For now we pass 20 threads to each worker.
-            // Optionally, for the last worker you could pass a smaller number if (proxyThreads % 20 !== 0)
-            workerPromises.push(runWorker(login, password, 50));
+            const threads = (i === numWorkers - 1) ? proxyThreads - (i * 50) : 50;
+            workerPromises.push(runWorker(login, password, threads));
             await randomDelay();
         }
     }
@@ -78,3 +87,16 @@ const main = async () => {
 };
 
 main();
+
+// Optionally, display the current statuses on the console every minute:
+setInterval(() => {
+    const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId }]) => {
+        return {
+            workerId,
+            threadId: threadId || 'N/A',
+            state,
+            lastUpdate: new Date(lastUpdate).toLocaleTimeString()
+        };
+    });
+    console.table(tableData);
+}, 60000);

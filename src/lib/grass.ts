@@ -39,15 +39,36 @@ export default class Grass {
     private userId!: string;
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
-    // Flag to prevent multiple reconnects
-    private isReconnecting: boolean = false;
 
-    constructor() {
+    // Added property to track current state of this thread
+    private currentThreadState: string = "idle";
+    private index: number = 0;
+
+    constructor(i: number) {
         this.browserId = uuidv4();
+        this.index = i;
+    }
+
+    /**
+     * Update the thread's current state and send a heartbeat to the parent process.
+     */
+    public setThreadState(state: string): void {
+        this.currentThreadState = state;
+        // Send a heartbeat message with the updated state (if process.send exists)
+        if (process.send) {
+            process.send({
+                type: 'threadHeartbeat',
+                workerId: `${process.pid}:${this.index}`, // Unique identifier for the worker process
+                threadId: this.browserId, // Unique identifier for the thread (Grass instance)
+                state: this.currentThreadState,
+                timestamp: Date.now()
+            });
+        }
     }
 
     // Log in and set up the axios instance.
     async login(email: string, password: string): Promise<void> {
+        this.setThreadState("logging in");
         this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
@@ -69,6 +90,7 @@ export default class Grass {
                 };
 
                 this.grassApi = axios.create(config);
+                this.setThreadState("logged in (session reused)");
                 return;
             }
 
@@ -85,6 +107,7 @@ export default class Grass {
                 };
 
                 this.grassApi = axios.create(config);
+                this.setThreadState("logged in");
                 return;
             }
 
@@ -106,7 +129,7 @@ export default class Grass {
             this.accessToken = res.data.result.data.accessToken;
             this.refreshToken = res.data.result.data.refreshToken;
 
-            const config: AxiosRequestConfig = {
+            const configAxios: AxiosRequestConfig = {
                 baseURL: "https://api.getgrass.io",
                 headers: {
                     Authorization: this.accessToken,
@@ -117,7 +140,7 @@ export default class Grass {
                 timeout: 20000,
             };
 
-            this.grassApi = axios.create(config);
+            this.grassApi = axios.create(configAxios);
 
             // Retrieve user data to set userId.
             const user: UserResponseData = await this.getUser();
@@ -126,7 +149,9 @@ export default class Grass {
                 accessToken: this.accessToken,
                 userId: this.userId
             }));
+            this.setThreadState("logged in");
         } catch (error: any) {
+            this.setThreadState("login error");
             logger.error("Error during login:" + error.message);
             throw error;
         }
@@ -139,7 +164,6 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving user data:" + error.message);
-            // Trigger reconnect if needed
             await this.triggerReconnect(true);
             throw error;
         }
@@ -159,6 +183,7 @@ export default class Grass {
 
     // Check‑in call similar to the Python version.
     async checkIn(): Promise<{ destinations: string[]; token: string }> {
+        this.setThreadState("checking in");
         try {
             const data = {
                 browserId: this.browserId,
@@ -177,10 +202,13 @@ export default class Grass {
             });
             const responseData = res.data;
             if (!responseData.destinations || responseData.destinations.length === 0) {
+                this.setThreadState("checkIn error");
                 throw new Error("No destinations returned from checkIn");
             }
+            this.setThreadState("checked in");
             return { destinations: responseData.destinations, token: responseData.token };
         } catch (error: any) {
+            this.setThreadState("checkIn error");
             logger.error("Error during checkIn:" + error.message);
             throw new Error("No destinations returned from checkIn");
         }
@@ -190,13 +218,14 @@ export default class Grass {
      * Opens a WebSocket connection using the destination and token from check‑in.
      */
     async connectWebSocket(destination: string, token: string): Promise<void> {
+        this.setThreadState("connecting websocket");
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = await ProxyManager.getProxy(true);
         this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
             // Clear the reconnect flag on a successful connection.
-            this.isReconnecting = false;
+            this.setThreadState("mining");
             // Set connection flags.
             this.sendPing();
             // Start periodic tasks: sending ping and checking score.
@@ -238,7 +267,6 @@ export default class Grass {
                         }
                     }
                 } else if (message.action === "PING") {
-                    // Respond to PING messages with a PONG.
                     const pongResponse = {
                         id: message.id,
                         origin_action: "PONG",
@@ -252,9 +280,8 @@ export default class Grass {
                     await this.sendMessage(pongResponse);
                     logger.debug(`Sent pong message with id ${message.id}`);
                 } else if (message.action === "MINING_REWARD") {
-                    // Handle mining reward messages (if available).
+                    // Handle mining reward messages.
                     const points = message.data?.points || 0;
-                    // Optionally update total points by calling getUser or a dedicated endpoint.
                 }
             } catch (err: any) {
                 logger.error("Error parsing message:" + err.message);
@@ -263,15 +290,12 @@ export default class Grass {
 
         this.ws.on("error", async (error: Error) => {
             logger.error("WebSocket error:" + error.message);
-            // Close socket; the "close" event will handle reconnection.
             this.handleWebSocketError();
         });
 
         this.ws.on("close", async (code: number, reason: Buffer) => {
             logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
-            // Stop periodic tasks.
             this.stopPeriodicTasks();
-            // Trigger a reconnect if not already in progress.
             await this.triggerReconnect();
         });
     }
@@ -322,7 +346,7 @@ export default class Grass {
         }
     }
 
-    // Perform an HTTP GET request and return the response (with Base64‑encoded body).
+    // Perform an HTTP GET request and return the response.
     async performHttpRequest(url: string): Promise<any> {
         try {
             await randomDelay();
@@ -349,19 +373,15 @@ export default class Grass {
         }
     }
 
-    // Check the mining score by calling the /activeDevices endpoint.
+    // Check the mining score.
     async checkMiningScore(): Promise<boolean> {
         try {
             await randomDelay();
             const res = await this.grassApi.get(`/retrieveDevice?input=%7B%22deviceId%22:%22${this.browserId}%22%7D`, { timeout: 20000 });
-
-            // Find the device where deviceId matches the current browserId
             const device = res.data.result.data;
             logger.debug('Devices: ' + JSON.stringify(device));
-
             let currentScore = 0;
             if (device) {
-                // Get ipScore as the network score
                 currentScore = device.ipScore;
             }
             console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
@@ -382,7 +402,7 @@ export default class Grass {
         }
     }
 
-    // Update the total points by calling the getUser endpoint.
+    // Update total points (for later statistics).
     async updateTotalPoints() {
         try {
             logger.debug(`Update points for later statistics`);
@@ -393,14 +413,13 @@ export default class Grass {
         }
     }
 
-    // Start periodic tasks: sending pings and checking score.
+    // Start periodic tasks.
     startPeriodicTasks(): void {
         this.stopPeriodicTasks();
         this.pingInterval = setInterval(async () => {
             await randomDelay();
             this.sendPing();
         }, 60000);
-        // Check mining score periodically. Adjust the interval as needed.
         setTimeout(async () => {
             await randomDelay();
             const scoreOk = await this.checkMiningScore();
@@ -422,12 +441,12 @@ export default class Grass {
         }
     }
 
-    // Change to a new proxy using the ProxyManager.
+    // Change to a new proxy.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
         this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
-        const config: AxiosRequestConfig = {
+        const configAxios: AxiosRequestConfig = {
             baseURL: "https://api.getgrass.io",
             headers: {
                 Authorization: this.accessToken,
@@ -437,11 +456,11 @@ export default class Grass {
             httpAgent: this.proxy,
             timeout: 20000,
         };
-        this.grassApi = axios.create(config);
+        this.grassApi = axios.create(configAxios);
         logger.info(`Proxy changed to: ${this.currentProxyUrl}`);
     }
 
-    // Handle WebSocket errors by closing the connection.
+    // Handle WebSocket errors.
     handleWebSocketError(): void {
         if (this.ws) {
             this.ws.close();
@@ -450,16 +469,10 @@ export default class Grass {
 
     /**
      * Trigger a reconnect if one is not already in progress.
-     * This method centralizes the reconnection logic.
      */
     async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
-        if (this.isReconnecting) {
-            logger.debug("Already reconnecting, skipping new reconnect trigger.");
-            return;
-        }
-        this.isReconnecting = true;
+        this.setThreadState("reconnecting");
         this.stopPeriodicTasks();
-        // Generate a new browserId for reconnection.
         this.browserId = uuidv4();
         await randomDelay();
 
@@ -470,22 +483,23 @@ export default class Grass {
             const { destinations, token } = await this.checkIn();
             await this.connectWebSocket(destinations[0] as string, token);
             logger.info("Reconnected successfully.");
-            this.isReconnecting = false;
+            this.setThreadState("mining");
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
             await delay(60000);
-            // Retry reconnection. The flag remains true during retries.
-            this.isReconnecting = false;
+            this.setThreadState("reconnect retry");
             await this.triggerReconnect(needProxyChange);
         }
     }
 
-    // Start the entire mining process: login, check‑in, and open the WebSocket.
+    // Start the mining process.
     async startMining(email: string, password: string): Promise<void> {
+        this.setThreadState("starting mining");
         try {
             await this.login(email, password);
         } catch (err: any) {
-            logger.error(`Cannot login to ${email} ${password}: ${err.message}`);
+            this.setThreadState("login failed");
+            logger.error(`Cannot login to ${email}: ${err.message}`);
             return;
         }
         try {
@@ -495,6 +509,7 @@ export default class Grass {
             await this.connectWebSocket(destinations[0] as string, token);
             await randomDelay();
         } catch (error: any) {
+            this.setThreadState("mining error");
             logger.error("Error starting mining:" + error.message);
             await delay(60000);
             await this.triggerReconnect();
