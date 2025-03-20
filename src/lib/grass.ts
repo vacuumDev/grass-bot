@@ -43,6 +43,7 @@ export default class Grass {
     // Added property to track current state of this thread
     private currentThreadState: string = "idle";
     private index: number = 0;
+    private email;
 
     constructor(i: number) {
         this.browserId = uuidv4();
@@ -61,6 +62,7 @@ export default class Grass {
                 workerId: `${process.pid}:${this.index}`, // Unique identifier for the worker process
                 threadId: this.browserId, // Unique identifier for the thread (Grass instance)
                 state: this.currentThreadState,
+                email: this.email,
                 timestamp: Date.now()
             });
         }
@@ -495,6 +497,7 @@ export default class Grass {
     // Start the mining process.
     async startMining(email: string, password: string): Promise<void> {
         this.setThreadState("starting mining");
+        this.email = email;
         try {
             await this.login(email, password);
         } catch (err: any) {

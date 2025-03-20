@@ -3,6 +3,11 @@
     {
       "login": "ericarafiesb@outlook.com",
       "proxyThreads": 80
+    },
+    {
+      "login": "ykseilbjln@rambler.ru",
+      "password": "11000345Gcoyz!",
+      "proxyThreads": 200
     }
   ],
   "delay": [100, 4000],

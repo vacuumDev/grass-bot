@@ -38,7 +38,8 @@ const runWorker = (login: string, password: string, threads: number) => {
                 const status: any = {
                     state: msg.state,
                     lastUpdate: msg.timestamp,
-                    threadId: msg.threadId
+                    threadId: msg.threadId,
+                    email: msg.email
                 };
                 workerStatuses.set(msg.workerId, status);
                 console.log(`Received heartbeat from worker ${msg.workerId}: ${msg.state}`);
@@ -90,10 +91,11 @@ main();
 
 // Optionally, display the current statuses on the console every minute:
 setInterval(() => {
-    const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId }]) => {
+    const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId, email }]) => {
         return {
             workerId,
             threadId: threadId || 'N/A',
+            email,
             state,
             lastUpdate: new Date(lastUpdate).toLocaleTimeString()
         };
