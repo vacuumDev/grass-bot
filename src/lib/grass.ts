@@ -69,9 +69,12 @@ export default class Grass {
     }
 
     // Log in and set up the axios instance.
-    async login(email: string, password: string): Promise<void> {
+    async login(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("logging in");
-        this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
+        if(!proxy)
+            this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
+        else this.currentProxyUrl = proxy;
+        console.log(this.currentProxyUrl)
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
         try {
@@ -495,11 +498,11 @@ export default class Grass {
     }
 
     // Start the mining process.
-    async startMining(email: string, password: string): Promise<void> {
+    async startMining(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("starting mining");
         this.email = email;
         try {
-            await this.login(email, password);
+            await this.login(email, password, proxy);
         } catch (err: any) {
             this.setThreadState("login failed");
             logger.error(`Cannot login to ${email}: ${err.message}`);

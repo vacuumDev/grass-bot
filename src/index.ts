@@ -28,7 +28,7 @@ function randomDelay(): Promise<void> {
 }
 
 // Function to run a worker process for given credentials and thread count
-const runWorker = (login: string, password: string, threads: number) => {
+const runWorker = (login: string, password: string, proxy: string, threads: number) => {
     return new Promise((resolve, reject) => {
         const workerPath = path.join(process.cwd(), 'dist/worker.js');
         const worker = fork(workerPath);
@@ -59,7 +59,7 @@ const runWorker = (login: string, password: string, threads: number) => {
         });
 
         // Send login, password and thread count to the worker
-        worker.send({ login, password, proxyThreads: threads });
+        worker.send({ login, password, proxy, proxyThreads: threads });
     });
 };
 
@@ -69,12 +69,12 @@ const main = async () => {
     // For each account, spawn enough workers so each worker gets a set number of threads.
     const workerPromises = [];
     for (const account of accounts) {
-        const { login, password, proxyThreads } = account;
+        const { login, password, proxy, proxyThreads } = account;
         // Determine the number of workers needed (each handling a fixed number of threads)
         const numWorkers = Math.ceil(proxyThreads / 50);
         for (let i = 0; i < numWorkers; i++) {
             const threads = (i === numWorkers - 1) ? proxyThreads - (i * 50) : 50;
-            workerPromises.push(runWorker(login, password, threads));
+            workerPromises.push(runWorker(login, password, proxy, threads));
             await randomDelay();
         }
     }
