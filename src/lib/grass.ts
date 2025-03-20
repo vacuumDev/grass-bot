@@ -373,7 +373,11 @@ export default class Grass {
             return true;
         } catch (error: any) {
             logger.error("Error checking mining score:" + error.message);
-            await this.triggerReconnect(true);
+            if(error.response) {
+                await this.triggerReconnect(error.response.status !== 404);
+            } else {
+                await this.triggerReconnect(true);
+            }
             return false;
         }
     }
@@ -407,7 +411,7 @@ export default class Grass {
                 }
                 await this.triggerReconnect();
             }
-        }, 180_000 * 10);
+        }, 180_000 * 20);
     }
 
     // Stop all periodic intervals.
