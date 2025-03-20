@@ -91,14 +91,19 @@ main();
 
 // Optionally, display the current statuses on the console every minute:
 setInterval(() => {
-    const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId, email }]) => {
-        return {
-            workerId,
-            threadId: threadId || 'N/A',
-            email,
-            state,
-            lastUpdate: new Date(lastUpdate).toLocaleTimeString()
-        };
-    });
-    console.table(tableData);
+    if (config.debug) {
+        const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId, email }]) => {
+            return {
+                workerId,
+                threadId: threadId || 'N/A',
+                email,
+                state,
+                lastUpdate: new Date(lastUpdate).toLocaleTimeString()
+            };
+        });
+        console.table(tableData);
+    } else {
+        const miningCount = Array.from(workerStatuses.values()).filter(status => status.state === 'mining').length;
+        console.log(`Number of workers mining: ${miningCount}`);
+    }
 }, 60000);
