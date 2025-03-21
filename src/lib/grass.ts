@@ -510,6 +510,7 @@ export default class Grass {
             logger.error("Reconnection failed:" + error.message);
             this.setThreadState("reconnect retry");
             await randomDelay();
+            await delay(60000);
             await this.triggerReconnect(false);
         }
     }
@@ -532,6 +533,7 @@ export default class Grass {
             this.setThreadState("mining error");
             logger.error("Error during mining process:" + error.message);
             await randomDelay();
+            await delay(60000);
             await this.triggerReconnect(false);
         }
     }
