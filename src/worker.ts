@@ -1,10 +1,19 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
 
+const delay = async (ms: number) => {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
 const processGrassAccount = async (login: string, password: string, proxy: string, proxyThreads: number) => {
     await RedisWorker.init();
-    const promises = []
+    const promises = [];
+
+    const min = 1000, max = 10_000;
+    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+
     for (let i = 0; i < proxyThreads; i++) {
+        await delay(ms)
         const grass = new Grass(i);
         promises.push(grass.startMining(login, password, proxy));
     }
