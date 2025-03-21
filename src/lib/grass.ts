@@ -224,14 +224,14 @@ export default class Grass {
 
         return new Promise<void>((resolve, reject) => {
             try {
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy), timeout: 20_000 });
 
                 this.ws.on("open", async () => {
                     this.setThreadState("mining");
                     try {
                         this.sendPing();
                     } catch (err) {
-                        logger.error("Reconnection failed:" + error.message);
+                        logger.error("Reconnection failed:" + err.message);
                         this.setThreadState("reconnect retry");
                         await delay(60000);
                         await this.triggerReconnect(false);
@@ -442,7 +442,7 @@ export default class Grass {
                 await randomDelay();
                 this.sendPing();
             } catch (err) {
-                logger.error("Reconnection failed:" + error.message);
+                logger.error("Reconnection failed:" + err.message);
                 this.setThreadState("reconnect retry");
                 await delay(60000);
                 await this.triggerReconnect(false);
@@ -507,7 +507,7 @@ export default class Grass {
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
             this.setThreadState("reconnect retry");
-            await delay(60000);
+            await randomDelay();
             await this.triggerReconnect(false);
         }
     }
@@ -529,7 +529,7 @@ export default class Grass {
         } catch (error: any) {
             this.setThreadState("mining error");
             logger.error("Error during mining process:" + error.message);
-            await delay(60000);
+            await randomDelay();
             await this.triggerReconnect(false);
         }
     }

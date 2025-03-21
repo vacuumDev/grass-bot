@@ -15,7 +15,7 @@ function generateRandom12Hex() {
 export default class ProxyManager {
     static rotatingProxy = config.rotatingProxy;
     static stickyProxy = config.stickyProxy;
-    static getProxy(useRotatingProxy = false): Promise<string> {
+    static getProxy(useRotatingProxy = false) {
         if(useRotatingProxy)
             return ProxyManager.rotatingProxy;
 
