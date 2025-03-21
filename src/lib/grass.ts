@@ -40,10 +40,12 @@ export default class Grass {
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
-    // Added property to track current state of this thread
+    // Track current state of this thread
     private currentThreadState: string = "idle";
     private index: number = 0;
-    private email;
+    private email: string;
+    // Flag to track whether a reconnect is in progress
+    private isReconnecting: boolean = false;
 
     constructor(i: number) {
         this.browserId = uuidv4();
@@ -55,12 +57,11 @@ export default class Grass {
      */
     public setThreadState(state: string): void {
         this.currentThreadState = state;
-        // Send a heartbeat message with the updated state (if process.send exists)
         if (process.send) {
             process.send({
                 type: 'threadHeartbeat',
-                workerId: `${process.pid}:${this.index}`, // Unique identifier for the worker process
-                threadId: this.browserId, // Unique identifier for the thread (Grass instance)
+                workerId: `${process.pid}:${this.index}`,
+                threadId: this.browserId,
                 state: this.currentThreadState,
                 email: this.email,
                 timestamp: Date.now()
@@ -71,10 +72,11 @@ export default class Grass {
     // Log in and set up the axios instance.
     async login(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("logging in");
-        if(!proxy)
+        if (!proxy)
             this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
-        else this.currentProxyUrl = proxy;
-        console.log(this.currentProxyUrl)
+        else
+            this.currentProxyUrl = proxy;
+        console.log(this.currentProxyUrl);
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
         try {
@@ -169,6 +171,7 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving user data:" + error.message);
+            // Call reconnect if fetching user data fails.
             await this.triggerReconnect(true);
             throw error;
         }
@@ -229,11 +232,10 @@ export default class Grass {
         this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
-            // Clear the reconnect flag on a successful connection.
+            // On successful connection, clear the reconnect flag.
+            this.isReconnecting = false;
             this.setThreadState("mining");
-            // Set connection flags.
             this.sendPing();
-            // Start periodic tasks: sending ping and checking score.
             this.startPeriodicTasks();
             logger.info("WebSocket connection opened.");
         });
@@ -285,8 +287,8 @@ export default class Grass {
                     await this.sendMessage(pongResponse);
                     logger.debug(`Sent pong message with id ${message.id}`);
                 } else if (message.action === "MINING_REWARD") {
-                    // Handle mining reward messages.
                     const points = message.data?.points || 0;
+                    // Handle mining reward messages.
                 }
             } catch (err: any) {
                 logger.error("Error parsing message:" + err.message);
@@ -301,6 +303,7 @@ export default class Grass {
         this.ws.on("close", async (code: number, reason: Buffer) => {
             logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
             this.stopPeriodicTasks();
+            // Centralize reconnection from here.
             await this.triggerReconnect();
         });
     }
@@ -398,7 +401,7 @@ export default class Grass {
             return true;
         } catch (error: any) {
             logger.error("Error checking mining score:" + error.message);
-            if(error.response) {
+            if (error.response) {
                 await this.triggerReconnect(error.response.status !== 404);
             } else {
                 await this.triggerReconnect(true);
@@ -469,6 +472,8 @@ export default class Grass {
     handleWebSocketError(): void {
         if (this.ws) {
             this.ws.close();
+            // Optionally ensure that isReconnecting is true.
+            this.isReconnecting = true;
         }
     }
 
@@ -476,6 +481,11 @@ export default class Grass {
      * Trigger a reconnect if one is not already in progress.
      */
     async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
+        if (this.isReconnecting) {
+            logger.info("Already reconnecting, skipping additional reconnect attempt.");
+            return;
+        }
+        this.isReconnecting = true;
         this.setThreadState("reconnecting");
         this.stopPeriodicTasks();
         this.browserId = uuidv4();
@@ -489,11 +499,14 @@ export default class Grass {
             await this.connectWebSocket(destinations[0] as string, token);
             logger.info("Reconnected successfully.");
             this.setThreadState("mining");
+            // The "open" event in connectWebSocket will clear isReconnecting.
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
-            await delay(60000);
             this.setThreadState("reconnect retry");
-            await this.triggerReconnect(needProxyChange);
+            // Reset the flag to allow future attempts.
+            this.isReconnecting = false;
+            await delay(60000);
+            await this.triggerReconnect(false);
         }
     }
 
