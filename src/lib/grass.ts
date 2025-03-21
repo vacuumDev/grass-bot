@@ -11,7 +11,7 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 
-// Read config from data/config.json and get the delay range.
+// Чтение конфига и получение диапазона задержки.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
 const delayRange: [number, number] = config.delay;
 
@@ -40,11 +40,11 @@ export default class Grass {
     private userAgent: string =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
-    // Track current state of this thread
+    // Текущее состояние потока
     private currentThreadState: string = "idle";
     private index: number = 0;
     private email: string;
-    // Flag to track whether a reconnect is in progress
+    // Флаг, сигнализирующий о том, что идёт попытка переподключения
     private isReconnecting: boolean = false;
 
     constructor(i: number) {
@@ -53,7 +53,7 @@ export default class Grass {
     }
 
     /**
-     * Update the thread's current state and send a heartbeat to the parent process.
+     * Обновление состояния потока и отправка heartbeat родительскому процессу.
      */
     public setThreadState(state: string): void {
         this.currentThreadState = state;
@@ -69,13 +69,10 @@ export default class Grass {
         }
     }
 
-    // Log in and set up the axios instance.
+    // Логин и настройка экземпляра axios.
     async login(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("logging in");
-        if (!proxy)
-            this.currentProxyUrl = ProxyManager.getProxy();
-        else
-            this.currentProxyUrl = proxy;
+        this.currentProxyUrl = proxy ? proxy : ProxyManager.getProxy();
         console.log(this.currentProxyUrl);
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
@@ -118,7 +115,6 @@ export default class Grass {
                 return;
             }
 
-            // Add a random delay before making the login request.
             await randomDelay();
             const res: AxiosResponse<ApiResponseDto<LoginResponseData>> = await axios.post(
                 "https://api.getgrass.io/login",
@@ -149,7 +145,7 @@ export default class Grass {
 
             this.grassApi = axios.create(configAxios);
 
-            // Retrieve user data to set userId.
+            // Получаем данные пользователя, чтобы установить userId.
             const user: UserResponseData = await this.getUser();
             this.userId = user.userId;
             await RedisWorker.setSession(email, JSON.stringify({
@@ -171,8 +167,6 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving user data:" + error.message);
-            // Call reconnect if fetching user data fails.
-            await this.triggerReconnect(true);
             throw error;
         }
     }
@@ -184,12 +178,11 @@ export default class Grass {
             return res.data.result.data;
         } catch (error: any) {
             logger.error("Error retrieving IP info:" + error.message);
-            await this.triggerReconnect(true);
             throw error;
         }
     }
 
-    // Check‑in call similar to the Python version.
+    // Check‑in: отправляет данные и получает destinations и token.
     async checkIn(): Promise<{ destinations: string[]; token: string }> {
         this.setThreadState("checking in");
         try {
@@ -218,97 +211,105 @@ export default class Grass {
         } catch (error: any) {
             this.setThreadState("checkIn error");
             logger.error("Error during checkIn:" + error.message);
-            throw new Error("No destinations returned from checkIn");
+            throw error;
         }
     }
 
     /**
-     * Opens a WebSocket connection using the destination and token from check‑in.
+     * Открывает WebSocket-соединение, обёрнутое в Promise.
+     * При ошибке (например, при отправке сообщения или закрытии сокета) вызывается reject.
      */
     async connectWebSocket(destination: string, token: string): Promise<void> {
         this.setThreadState("connecting websocket");
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = ProxyManager.getProxy(true);
-        this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
-        this.ws.on("open", () => {
-            // On successful connection, clear the reconnect flag.
-            this.isReconnecting = false;
-            this.setThreadState("mining");
-            this.sendPing();
-            this.startPeriodicTasks();
-            logger.info("WebSocket connection opened.");
-        });
-
-        this.ws.on("message", async (data: WebSocket.Data) => {
-            const messageStr = data.toString();
-            logger.debug(`Received message: ${messageStr}`);
+        return new Promise<void>((resolve, reject) => {
             try {
-                const message = JSON.parse(messageStr);
-                if (message.action === "HTTP_REQUEST") {
-                    const requestUrl = message.data.url;
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
+
+                this.ws.on("open", () => {
+                    this.isReconnecting = false;
+                    this.setThreadState("mining");
+                    this.sendPing();
+                    this.startPeriodicTasks();
+                    logger.info("WebSocket connection opened.");
+                });
+
+                this.ws.on("message", async (data: WebSocket.Data) => {
+                    const messageStr = data.toString();
+                    logger.debug(`Received message: ${messageStr}`);
                     try {
-                        const result = await this.performHttpRequest(requestUrl);
-                        const responseMessage = {
-                            id: message.id,
-                            origin_action: message.action,
-                            result: result,
-                        };
-                        await this.sendMessage(responseMessage);
-                        logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
-                    } catch (err: any) {
-                        try {
-                            const result = await this.performHttpRequest(requestUrl);
-                            const responseMessage = {
+                        const message = JSON.parse(messageStr);
+                        if (message.action === "HTTP_REQUEST") {
+                            const requestUrl = message.data.url;
+                            try {
+                                const result = await this.performHttpRequest(requestUrl);
+                                const responseMessage = {
+                                    id: message.id,
+                                    origin_action: message.action,
+                                    result: result,
+                                };
+                                await this.sendMessage(responseMessage);
+                                logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
+                            } catch (err: any) {
+                                // Пытаемся выполнить запрос ещё раз перед выбросом ошибки.
+                                try {
+                                    const result = await this.performHttpRequest(requestUrl);
+                                    const responseMessage = {
+                                        id: message.id,
+                                        origin_action: message.action,
+                                        result: result,
+                                    };
+                                    await this.sendMessage(responseMessage);
+                                    logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
+                                } catch (err: any) {
+                                    logger.error("Error during HTTP_REQUEST:" + err.message);
+                                    reject(err);
+                                }
+                            }
+                        } else if (message.action === "PING") {
+                            const pongResponse = {
                                 id: message.id,
-                                origin_action: message.action,
-                                result: result,
+                                origin_action: "PONG",
                             };
-                            await this.sendMessage(responseMessage);
-                            logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
-                        } catch (err: any) {
-                            logger.error("Error during HTTP_REQUEST:" + err.message);
-                            await this.triggerReconnect();
-                            this.ws?.close();
-                            return;
+                            await this.sendMessage(pongResponse);
+                        } else if (message.action === "PONG") {
+                            const pongResponse = {
+                                id: message.id,
+                                origin_action: "PONG",
+                            };
+                            await this.sendMessage(pongResponse);
+                            logger.debug(`Sent pong message with id ${message.id}`);
+                        } else if (message.action === "MINING_REWARD") {
+                            // Обработка сообщения о награде за майнинг.
+                            const points = message.data?.points || 0;
                         }
+                    } catch (err: any) {
+                        logger.error("Error parsing message:" + err.message);
+                        reject(err);
                     }
-                } else if (message.action === "PING") {
-                    const pongResponse = {
-                        id: message.id,
-                        origin_action: "PONG",
-                    };
-                    await this.sendMessage(pongResponse);
-                } else if (message.action === "PONG") {
-                    const pongResponse = {
-                        id: message.id,
-                        origin_action: "PONG",
-                    };
-                    await this.sendMessage(pongResponse);
-                    logger.debug(`Sent pong message with id ${message.id}`);
-                } else if (message.action === "MINING_REWARD") {
-                    const points = message.data?.points || 0;
-                    // Handle mining reward messages.
-                }
+                });
+
+                this.ws.on("error", (error: Error) => {
+                    logger.error("WebSocket error:" + error.message);
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                });
+
+                this.ws.on("close", (code: number, reason: Buffer) => {
+                    logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
+                    this.stopPeriodicTasks();
+                    reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
+                });
             } catch (err: any) {
-                logger.error("Error parsing message:" + err.message);
+                reject(err);
             }
-        });
-
-        this.ws.on("error", async (error: Error) => {
-            logger.error("WebSocket error:" + error.message);
-            this.handleWebSocketError();
-        });
-
-        this.ws.on("close", async (code: number, reason: Buffer) => {
-            logger.info(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
-            this.stopPeriodicTasks();
-            // Centralize reconnection from here.
-            await this.triggerReconnect();
         });
     }
 
-    // Send browser information to the server.
+    // Отправка информации о браузере.
     sendBrowserInfo(): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const browserInfo = {
@@ -325,10 +326,12 @@ export default class Grass {
                 },
             };
             this.ws.send(JSON.stringify(browserInfo));
+        } else {
+            logger.error("WebSocket is not open. Cannot send browser info.");
         }
     }
 
-    // Send a PING message.
+    // Отправка PING-сообщения.
     sendPing(): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const pingId = uuidv4();
@@ -341,20 +344,23 @@ export default class Grass {
             this.ws.send(JSON.stringify(pingMessage));
             this.pingCount++;
             logger.debug(`Sent PING message with id: ${pingId} | Total Pings: ${this.pingCount}`);
+        } else {
+            logger.error("WebSocket is not open. Cannot send PING.");
+            throw new Error('Can not send message')
         }
     }
 
-    // Send an arbitrary message over the WebSocket.
+    // Отправка произвольного сообщения через WebSocket.
     async sendMessage(message: any): Promise<void> {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
             logger.error("WebSocket is not open. Cannot send message.");
-            await this.triggerReconnect();
+            throw new Error("WebSocket is not open");
         }
     }
 
-    // Perform an HTTP GET request and return the response.
+    // Выполнение HTTP GET запроса с последующим кодированием тела ответа.
     async performHttpRequest(url: string): Promise<any> {
         try {
             await randomDelay();
@@ -381,7 +387,7 @@ export default class Grass {
         }
     }
 
-    // Check the mining score.
+    // Проверка mining score.
     async checkMiningScore(): Promise<boolean> {
         try {
             await randomDelay();
@@ -395,33 +401,27 @@ export default class Grass {
             console.log(`Network Score for device ${this.browserId}: ${currentScore}%`);
 
             if (currentScore === 0 || currentScore < this.minScoreThreshold) {
-                logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%), reconnecting.`);
+                logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%).`);
                 return false;
             }
             return true;
         } catch (error: any) {
             logger.error("Error checking mining score:" + error.message);
-            if (error.response) {
-                await this.triggerReconnect(error.response.status !== 404);
-            } else {
-                await this.triggerReconnect(true);
-            }
             return false;
         }
     }
 
-    // Update total points (for later statistics).
-    async updateTotalPoints() {
+    // Обновление статистики очков (в дальнейшем).
+    async updateTotalPoints(): Promise<void> {
         try {
             logger.debug(`Update points for later statistics`);
         } catch (error: any) {
             logger.error("Error updating total points:" + error.message);
-            await this.triggerReconnect(true);
-            return 0;
+            throw error;
         }
     }
 
-    // Start periodic tasks.
+    // Запуск периодических задач.
     startPeriodicTasks(): void {
         this.stopPeriodicTasks();
         this.pingInterval = setInterval(async () => {
@@ -436,12 +436,11 @@ export default class Grass {
                 if (this.ws) {
                     this.ws.close();
                 }
-                await this.triggerReconnect();
             }
         }, 180_000 * 20);
     }
 
-    // Stop all periodic intervals.
+    // Остановка всех периодических задач.
     stopPeriodicTasks(): void {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
@@ -449,7 +448,7 @@ export default class Grass {
         }
     }
 
-    // Change to a new proxy.
+    // Смена прокси.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
         this.currentProxyUrl = ProxyManager.getProxy();
@@ -468,17 +467,17 @@ export default class Grass {
         logger.info(`Proxy changed to: ${this.currentProxyUrl}`);
     }
 
-    // Handle WebSocket errors.
+    // Обработка ошибок WebSocket (только закрываем соединение и выставляем флаг).
     handleWebSocketError(): void {
         if (this.ws) {
             this.ws.close();
-            // Optionally ensure that isReconnecting is true.
-            this.isReconnecting = true;
         }
     }
 
     /**
-     * Trigger a reconnect if one is not already in progress.
+     * Попытка переподключения.
+     * Если происходит ошибка при checkIn или connectWebSocket, то ошибка пробрасывается наружу
+     * и может быть обработана внешним блоком catch для повторного вызова triggerReconnect.
      */
     async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
         if (this.isReconnecting) {
@@ -499,29 +498,24 @@ export default class Grass {
             await this.connectWebSocket(destinations[0] as string, token);
             logger.info("Reconnected successfully.");
             this.setThreadState("mining");
-            // The "open" event in connectWebSocket will clear isReconnecting.
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
             this.setThreadState("reconnect retry");
-            // Reset the flag to allow future attempts.
             this.isReconnecting = false;
             await delay(60000);
             await this.triggerReconnect(false);
         }
     }
 
-    // Start the mining process.
+    /**
+     * Запуск процесса майнинга.
+     * В случае возникновения ошибки, она пробрасывается наружу для дальнейшей обработки (например, вызова triggerReconnect).
+     */
     async startMining(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("starting mining");
         this.email = email;
         try {
             await this.login(email, password, proxy);
-        } catch (err: any) {
-            this.setThreadState("login failed");
-            logger.error(`Cannot login to ${email}: ${err.message}`);
-            return;
-        }
-        try {
             await randomDelay();
             const { destinations, token } = await this.checkIn();
             await randomDelay();
@@ -529,9 +523,8 @@ export default class Grass {
             await randomDelay();
         } catch (error: any) {
             this.setThreadState("mining error");
-            logger.error("Error starting mining:" + error.message);
-            await delay(60000);
-            await this.triggerReconnect();
+            logger.error("Error during mining process:" + error.message);
+            throw error;
         }
     }
 }
