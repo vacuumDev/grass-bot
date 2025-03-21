@@ -19,6 +19,7 @@ const processGrassAccount = async (login: string, password: string, proxy: strin
     }
     // Prevent the worker from exiting immediately (if needed)
     await Promise.all(promises);
+    await new Promise(() => {});
 };
 
 process.on('message', async (msg: { login: string; password: string; proxy: string; proxyThreads: number }) => {
@@ -29,7 +30,5 @@ process.on('message', async (msg: { login: string; password: string; proxy: stri
         // Send error message back if needed
         //@ts-ignore
         process.send({ success: false, error: error.message });
-    } finally {
-        process.exit();
     }
 });
