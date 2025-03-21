@@ -524,7 +524,9 @@ export default class Grass {
         } catch (error: any) {
             this.setThreadState("mining error");
             logger.error("Error during mining process:" + error.message);
-            throw error;
+            this.isReconnecting = false;
+            await delay(60000);
+            await this.triggerReconnect(false);
         }
     }
 }
