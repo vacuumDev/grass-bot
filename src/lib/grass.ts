@@ -44,8 +44,6 @@ export default class Grass {
     private currentThreadState: string = "idle";
     private index: number = 0;
     private email: string;
-    // Флаг, сигнализирующий о том, что идёт попытка переподключения
-    private isReconnecting: boolean = false;
 
     constructor(i: number) {
         this.browserId = uuidv4();
@@ -229,7 +227,6 @@ export default class Grass {
                 this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
                 this.ws.on("open", () => {
-                    this.isReconnecting = false;
                     this.setThreadState("mining");
                     this.sendPing();
                     this.startPeriodicTasks();
@@ -480,11 +477,6 @@ export default class Grass {
      * и может быть обработана внешним блоком catch для повторного вызова triggerReconnect.
      */
     async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
-        if (this.isReconnecting) {
-            logger.info("Already reconnecting, skipping additional reconnect attempt.");
-            return;
-        }
-        this.isReconnecting = true;
         this.setThreadState("reconnecting");
         this.stopPeriodicTasks();
         this.browserId = uuidv4();
@@ -501,7 +493,6 @@ export default class Grass {
         } catch (error: any) {
             logger.error("Reconnection failed:" + error.message);
             this.setThreadState("reconnect retry");
-            this.isReconnecting = false;
             await delay(60000);
             await this.triggerReconnect(false);
         }
@@ -524,7 +515,6 @@ export default class Grass {
         } catch (error: any) {
             this.setThreadState("mining error");
             logger.error("Error during mining process:" + error.message);
-            this.isReconnecting = false;
             await delay(60000);
             await this.triggerReconnect(false);
         }
