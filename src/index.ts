@@ -42,7 +42,6 @@ const runWorker = (login: string, password: string, proxy: string, threads: numb
                     pingCount: msg.pingCount
                 };
                 workerStatuses.set(msg.workerId, status);
-                console.log(`Received heartbeat from worker ${msg.workerId}: ${msg.state}`);
             }
         });
 
