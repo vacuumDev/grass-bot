@@ -73,7 +73,7 @@ export default class Grass {
     async login(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("logging in");
         if (!proxy)
-            this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
+            this.currentProxyUrl = ProxyManager.getProxy();
         else
             this.currentProxyUrl = proxy;
         console.log(this.currentProxyUrl);
@@ -202,7 +202,7 @@ export default class Grass {
                 deviceType: "extension",
             };
             await randomDelay();
-            const rotatingProxy = await ProxyManager.getProxy(true);
+            const rotatingProxy = ProxyManager.getProxy(true);
             const res = await axios.post("https://director.getgrass.io/checkin", data, {
                 httpsAgent: new HttpsProxyAgent(rotatingProxy),
                 httpAgent: new HttpsProxyAgent(rotatingProxy),
@@ -228,7 +228,7 @@ export default class Grass {
     async connectWebSocket(destination: string, token: string): Promise<void> {
         this.setThreadState("connecting websocket");
         const wsUrl = `ws://${destination}/?token=${token}`;
-        const rotatingProxy = await ProxyManager.getProxy(true);
+        const rotatingProxy = ProxyManager.getProxy(true);
         this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
         this.ws.on("open", () => {
@@ -452,7 +452,7 @@ export default class Grass {
     // Change to a new proxy.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
-        this.currentProxyUrl = (await ProxyManager.getProxy()) as string;
+        this.currentProxyUrl = ProxyManager.getProxy();
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
         const configAxios: AxiosRequestConfig = {
             baseURL: "https://api.getgrass.io",
