@@ -3,12 +3,13 @@ import RedisWorker from "./lib/redis-worker.js";
 
 const processGrassAccount = async (login: string, password: string, proxy: string, proxyThreads: number) => {
     await RedisWorker.init();
+    const promises = []
     for (let i = 0; i < proxyThreads; i++) {
         const grass = new Grass(i);
-        await grass.startMining(login, password, proxy);
+        promises.push(grass.startMining(login, password, proxy));
     }
     // Prevent the worker from exiting immediately (if needed)
-    await new Promise(() => {});
+    await Promise.all(promises);
 };
 
 process.on('message', async (msg: { login: string; password: string; proxy: string; proxyThreads: number }) => {
