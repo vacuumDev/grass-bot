@@ -226,7 +226,7 @@ export default class Grass {
             try {
                 this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
-                this.ws.on("open", () => {
+                this.ws.on("open", async () => {
                     this.setThreadState("mining");
                     try {
                         this.sendPing();
