@@ -72,7 +72,6 @@ export default class Grass {
     async login(email: string, password: string, proxy: string | undefined): Promise<void> {
         this.setThreadState("logging in");
         this.currentProxyUrl = proxy ? proxy : ProxyManager.getProxy();
-        console.log(this.currentProxyUrl);
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
 
         try {
