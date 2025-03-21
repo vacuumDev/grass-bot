@@ -62,6 +62,7 @@ export default class Grass {
                 threadId: this.browserId,
                 state: this.currentThreadState,
                 email: this.email,
+                pingCount: this.pingCount,
                 timestamp: Date.now()
             });
         }
@@ -347,6 +348,7 @@ export default class Grass {
             };
             this.ws.send(JSON.stringify(pingMessage));
             this.pingCount++;
+            this.setThreadState(this.currentThreadState);
             logger.debug(`Sent PING message with id: ${pingId} | Total Pings: ${this.pingCount}`);
         } else {
             logger.error("WebSocket is not open. Cannot send PING.");

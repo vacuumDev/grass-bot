@@ -39,7 +39,8 @@ const runWorker = (login: string, password: string, proxy: string, threads: numb
                     state: msg.state,
                     lastUpdate: msg.timestamp,
                     threadId: msg.threadId,
-                    email: msg.email
+                    email: msg.email,
+                    pingCount: msg.pingCount
                 };
                 workerStatuses.set(msg.workerId, status);
                 console.log(`Received heartbeat from worker ${msg.workerId}: ${msg.state}`);
@@ -92,13 +93,13 @@ main();
 // Optionally, display the current statuses on the console every minute:
 setInterval(() => {
     if (config.debug) {
-        const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId, email }]) => {
+        const tableData = Array.from(workerStatuses.entries()).map(([workerId, { state, lastUpdate, threadId, email, pingCount }]) => {
             return {
                 workerId,
-                threadId: threadId || 'N/A',
                 email,
                 state,
-                lastUpdate: new Date(lastUpdate).toLocaleTimeString()
+                pingCount,
+                lastUpdate: new Date(lastUpdate).toISOString()
             };
         });
         console.table(tableData);
@@ -106,4 +107,4 @@ setInterval(() => {
         const miningCount = Array.from(workerStatuses.values()).filter(status => status.state === 'mining').length;
         console.log(`Number of workers mining: ${miningCount}`);
     }
-}, 60000);
+}, 60_000);
