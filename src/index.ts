@@ -16,8 +16,7 @@ const workerStatuses = new Map<string, any>();
 
 // Read and parse configuration
 const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
-const accounts = config.accounts;
-console.log('Loaded config:', accounts);
+let accounts = config.accounts;
 
 // Delay range from config if needed
 const [minDelay, maxDelay] = config.delay || [100, 10000];
@@ -66,6 +65,48 @@ const runWorker = (login: string, password: string, proxy: string, threads: numb
 
 const main = async () => {
     await RedisWorker.init();
+
+    const readyAccountsPath = path.join(process.cwd(), 'data/ready_accounts.txt');
+    if (fs.existsSync(readyAccountsPath)) {
+        const fileContent = fs.readFileSync(readyAccountsPath, 'utf-8');
+        const lines = fileContent.split('\n').filter(line => line.trim() !== '');
+        for (const line of lines) {
+            const parts = line.split(':');
+            if (parts.length >= 6) {
+                const email = parts[0];
+
+                if (accounts.some(acc => acc.login === email)) {
+                    console.log(`Account ${email} already exists in config, skipping.`);
+                    continue;
+                }
+
+                const accessToken = parts[4];
+                const userId = parts[5];
+                try {
+                    await RedisWorker.setSession(email, JSON.stringify({
+                        accessToken: accessToken,
+                        userId: userId
+                    }));
+                    accounts.push({
+                        login: email,
+                        proxyThreads: 200
+                    });
+                    console.log(`Redis session set for ${email}`);
+                } catch (err) {
+                    console.error(`Failed to set session for ${email}: ${err}`);
+                }
+            } else {
+                console.warn(`Skipping invalid line in ready_accounts.txt: ${line}`);
+            }
+        }
+    } else {
+        console.log('No ready_accounts.txt file found, skipping Redis session setup from file.');
+    }
+
+    config.accounts = accounts;
+    fs.writeFileSync('data/config.json', JSON.stringify(config, null, 2))
+
+    console.log('Loaded config:', accounts);
 
     // For each account, spawn enough workers so each worker gets a set number of threads.
     const workerPromises = [];
