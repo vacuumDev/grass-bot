@@ -228,7 +228,14 @@ export default class Grass {
 
                 this.ws.on("open", () => {
                     this.setThreadState("mining");
-                    this.sendPing();
+                    try {
+                        this.sendPing();
+                    } catch (err) {
+                        logger.error("Reconnection failed:" + error.message);
+                        this.setThreadState("reconnect retry");
+                        await delay(60000);
+                        await this.triggerReconnect(false);
+                    }
                     this.startPeriodicTasks();
                     logger.info("WebSocket connection opened.");
                 });
@@ -418,12 +425,28 @@ export default class Grass {
         }
     }
 
+
+    // Остановка всех периодических задач.
+    stopPeriodicTasks(): void {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = undefined;
+        }
+    }
+
     // Запуск периодических задач.
     startPeriodicTasks(): void {
         this.stopPeriodicTasks();
         this.pingInterval = setInterval(async () => {
-            await randomDelay();
-            this.sendPing();
+            try {
+                await randomDelay();
+                this.sendPing();
+            } catch (err) {
+                logger.error("Reconnection failed:" + error.message);
+                this.setThreadState("reconnect retry");
+                await delay(60000);
+                await this.triggerReconnect(false);
+            }
         }, 60000);
         setTimeout(async () => {
             await randomDelay();
@@ -436,15 +459,6 @@ export default class Grass {
             }
         }, 180_000 * 20);
     }
-
-    // Остановка всех периодических задач.
-    stopPeriodicTasks(): void {
-        if (this.pingInterval) {
-            clearInterval(this.pingInterval);
-            this.pingInterval = undefined;
-        }
-    }
-
     // Смена прокси.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
