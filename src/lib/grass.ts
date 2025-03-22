@@ -448,7 +448,7 @@ export default class Grass {
                 await delay(60000);
                 await this.triggerReconnect(false);
             }
-        }, 60000);
+        }, 120_000);
         // setTimeout(async () => {
         //     await randomDelay();
         //     const scoreOk = await this.checkMiningScore();
