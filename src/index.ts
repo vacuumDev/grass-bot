@@ -219,7 +219,7 @@ function scheduleStatsUpdate() {
         console.log(`Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints}`);
 
         scheduleStatsUpdate();
-    }, 5000); // 10–40 минут getRandomInterval(600000, 2400000)
+    }, 60_000);
 }
 
 scheduleStatsUpdate();
