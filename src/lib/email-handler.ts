@@ -47,9 +47,7 @@ class EmailHandler {
         try {
             const response = await axios.post(url, postData, axiosConfig);
             token = response.data.access_token;
-            console.debug(`Access token retrieved: ${token}`);
         } catch (error) {
-            console.error(`Error during first token request: ${error.message}`);
             // Second attempt with an additional scope
             try {
                 const postData2 = new URLSearchParams();
@@ -59,9 +57,7 @@ class EmailHandler {
                 postData2.append('scope', 'https://outlook.office.com/IMAP.AccessAsUser.All');
                 const response2 = await axios.post(url, postData2, axiosConfig);
                 token = response2.data.access_token;
-                console.debug(`Access token retrieved on second attempt: ${token}`);
             } catch (error2) {
-                console.error(`Error during second token request: ${error2.message}`);
             }
         }
         return token;
@@ -130,15 +126,12 @@ class EmailHandler {
                             return;
                         }
                         const mailbox = mailboxes.shift();
-                        console.log(`Opening mailbox: ${mailbox}`);
                         imap.openBox(mailbox, true, (err, box) => {
                             if (err) {
-                                console.error(`Error opening mailbox ${mailbox}:`, err);
                                 return processMailbox(mailboxes);
                             }
                             imap.search(['ALL'], (err, results) => {
                                 if (err) {
-                                    console.error(`Search error in mailbox ${mailbox}:`, err);
                                     return processMailbox(mailboxes);
                                 }
                                 if (!results || results.length === 0) {
@@ -162,11 +155,9 @@ class EmailHandler {
                                         });
                                     });
                                     msg.once('error', (err) => {
-                                        console.error(`Error processing message ${seqno}:`, err);
                                     });
                                 });
                                 fetcher.once('error', (err) => {
-                                    console.error(`Fetch error:`, err);
                                 });
                                 fetcher.once('end', () => {
                                     processMailbox(mailboxes);
@@ -184,7 +175,6 @@ class EmailHandler {
             });
 
             imap.once('end', () => {
-                console.log('IMAP connection ended');
             });
 
             imap.connect();

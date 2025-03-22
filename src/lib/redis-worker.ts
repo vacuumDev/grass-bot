@@ -1,4 +1,5 @@
 import redis from 'redis';
+import {logger} from "./logger.js";
 
 class RedisWorker {
     static client: any;
@@ -11,7 +12,7 @@ class RedisWorker {
             password: 'fhg384f3h387f383f30h43h84'
         });
 
-        client.on("error", (err) => console.error("Redis error:", err));
+        client.on("error", (err) => logger.debug("Redis error:" + err));
         await client.connect();
         const exists = await client.exists("currentIndex");
         if (!exists) {

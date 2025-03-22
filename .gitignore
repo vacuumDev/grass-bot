@@ -137,3 +137,5 @@ dist
 
 .idea
 .DS_Store
+data/config.json
+data/ready_accounts.txt

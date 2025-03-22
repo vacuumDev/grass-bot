@@ -5,7 +5,7 @@ const delay = async (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const processGrassAccount = async (login: string, password: string, proxy: string, proxyThreads: number) => {
+const processGrassAccount = async (login: string, password: string, stickyProxy: string, rotatingProxy: string, proxyThreads: number, isPrimary: boolean) => {
     await RedisWorker.init();
     const promises = [];
 
@@ -14,18 +14,18 @@ const processGrassAccount = async (login: string, password: string, proxy: strin
 
     for (let i = 0; i < proxyThreads; i++) {
         await delay(ms)
-        const grass = new Grass(i);
-        promises.push(grass.startMining(login, password, proxy));
+        const grass = new Grass(i, isPrimary && i === 0);
+        promises.push(grass.startMining(login, password, stickyProxy, rotatingProxy));
     }
     // Prevent the worker from exiting immediately (if needed)
     await Promise.all(promises);
     await new Promise(() => {});
 };
 
-process.on('message', async (msg: { login: string; password: string; proxy: string; proxyThreads: number }) => {
-    const { login, password, proxy, proxyThreads } = msg;
+process.on('message', async (msg: { login: string; password: string; stickyProxy: string; rotatingProxy: string; isPrimary: boolean; proxyThreads: number }) => {
+    const { login, password, stickyProxy, rotatingProxy, proxyThreads, isPrimary } = msg;
     try {
-        await processGrassAccount(login, password, proxy, proxyThreads);
+        await processGrassAccount(login, password, stickyProxy, rotatingProxy, proxyThreads, isPrimary);
     } catch (error: any) {
         // Send error message back if needed
         //@ts-ignore
