@@ -449,16 +449,16 @@ export default class Grass {
                 await this.triggerReconnect(false);
             }
         }, 60000);
-        setTimeout(async () => {
-            await randomDelay();
-            const scoreOk = await this.checkMiningScore();
-            if (!scoreOk) {
-                this.stopPeriodicTasks();
-                if (this.ws) {
-                    this.ws.close();
-                }
-            }
-        }, 180_000 * 20);
+        // setTimeout(async () => {
+        //     await randomDelay();
+        //     const scoreOk = await this.checkMiningScore();
+        //     if (!scoreOk) {
+        //         this.stopPeriodicTasks();
+        //         if (this.ws) {
+        //             this.ws.close();
+        //         }
+        //     }
+        // }, 180_000 * 20);
     }
     // Смена прокси.
     async changeProxy(): Promise<void> {

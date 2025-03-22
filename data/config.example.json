@@ -1,0 +1,21 @@
+{
+  "accounts": [
+    {
+      "login": "ericarafiesb@outlook.com",
+      "proxy": "http://maddnivan_gmail_com-country-any-sid-e55d2591b3574-filter-medium:hy9o97m71v@gate.nodemaven.com:8080",
+      "proxyThreads": 80
+    },
+    {
+      "login": "ykseilbjln@rambler.ru",
+      "password": "11000345Gcoyz!",
+      "proxyThreads": 200
+    }
+  ],
+  "delay": [
+    100,
+    4000
+  ],
+  "rotatingProxy": "http://maddnivan_gmail_com-country-any-filter-medium:hy9o97m71v@gate.nodemaven.com:8080",
+  "stickyProxy": "http://maddnivan_gmail_com-country-any-sid-{ID}4-filter-medium:hy9o97m71v@gate.nodemaven.com:8080",
+  "debug": true
+}
