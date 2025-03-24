@@ -5,6 +5,7 @@
       "password": "11000345Gcoyz!",
       "proxyThreads": 5,
       "rotatingProxy": "http://maddnivan_gmail_com-country-any-filter-medium:hy9o97m71v@gate.nodemaven.com:8080",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
       "stickyProxy": "http://maddnivan_gmail_com-country-any-sid-{ID}4-filter-medium:hy9o97m71v@gate.nodemaven.com:8080"
     },
     {
