@@ -10,6 +10,7 @@ import ProxyManager from "./proxy-manager.js";
 import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
+import UserAgent from "user-agents";
 
 // Чтение конфига и получение диапазона задержки.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
@@ -38,7 +39,7 @@ export default class Grass {
     private currentProxyUrl?: string;
     private userId!: string;
     private userAgent: string =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+        new UserAgent({ deviceCategory: 'desktop' }).toString();
 
     // Текущее состояние потока
     private currentThreadState: string = "idle";
@@ -196,7 +197,7 @@ export default class Grass {
                 userId: this.userId,
                 version: "5.0.0",
                 extensionId: "lkbnfiajjmbhnfledhphioinpickokdi",
-                userAgent: this.userAgent,
+                userAgent: new UserAgent({ deviceCategory: 'desktop' }).toString(),
                 deviceType: "extension",
             };
             await randomDelay();
@@ -304,9 +305,6 @@ export default class Grass {
 
                 this.ws.on("error", (error: Error) => {
                     logger.debug("WebSocket error:" + error);
-                    if (this.ws) {
-                        this.ws.close();
-                    }
                 });
 
                 this.ws.on("close", (code: number, reason: Buffer) => {
@@ -329,7 +327,6 @@ export default class Grass {
                 result: {
                     browser_id: this.browserId,
                     user_id: this.userId,
-                    user_agent: this.userAgent,
                     timestamp: Math.floor(Date.now() / 1000),
                     device_type: "extension",
                     version: "5.1.1",

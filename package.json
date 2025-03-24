@@ -27,7 +27,7 @@
     "https-proxy-agent": "^7.0.6",
     "imap": "^0.8.19",
     "redis": "^4.7.0",
-    "user-agents": "^1.1.482",
+    "user-agents": "^1.1.488",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "ws": "^8.18.1"
