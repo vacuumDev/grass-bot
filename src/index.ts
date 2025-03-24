@@ -26,10 +26,6 @@ function formatDuration(ms: number): string {
     return `${days}d ${hours}h ${minutes}m`;
 }
 
-function getRandomInterval(minMs: number, maxMs: number): number {
-    return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-}
-
 
 // Read and parse configuration
 const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
@@ -44,7 +40,7 @@ function randomDelay(): Promise<void> {
 }
 
 // Function to run a worker process for given credentials and thread count
-const runWorker = (login: string, password: string, stickyProxy: string, rotatingProxy: string, threads: number, isPrimary: boolean) => {
+const runWorker = (login: string, password: string, stickyProxy: string, rotatingProxy: string, threads: number, isPrimary: boolean, userAgent: string) => {
     return new Promise((resolve, reject) => {
         const workerPath = path.join(process.cwd(), 'dist/worker.js');
         const worker = fork(workerPath);
@@ -81,65 +77,25 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
         });
 
         // Send login, password and thread count to the worker
-        worker.send({ login, password, stickyProxy, rotatingProxy, proxyThreads: threads, isPrimary });
+        worker.send({ login, password, stickyProxy, rotatingProxy, proxyThreads: threads, isPrimary, userAgent });
     });
 };
 
 const main = async () => {
     await RedisWorker.init();
 
-    const readyAccountsPath = path.join(process.cwd(), 'data/ready_accounts.txt');
-    if (fs.existsSync(readyAccountsPath)) {
-        const fileContent = fs.readFileSync(readyAccountsPath, 'utf-8');
-        const lines = fileContent.split('\n').filter(line => line.trim() !== '');
-        for (const line of lines) {
-            const parts = line.split(':');
-            if (parts.length >= 6) {
-                const email = parts[0];
-
-                if (accounts.some(acc => acc.login === email)) {
-                    logger.debug(`Account ${email} already exists in config, skipping.`);
-                    continue;
-                }
-
-                const accessToken = parts[4];
-                const userId = parts[5];
-                try {
-                    await RedisWorker.setSession(email, JSON.stringify({
-                        accessToken: accessToken,
-                        userId: userId
-                    }));
-                    accounts.push({
-                        login: email,
-                        proxyThreads: 200
-                    });
-                    logger.debug(`Redis session set for ${email}`);
-                } catch (err) {
-                    logger.debug(`Failed to set session for ${email}: ${err}`);
-                }
-            } else {
-                logger.debug(`Skipping invalid line in ready_accounts.txt: ${line}`);
-            }
-        }
-    } else {
-        logger.debug('No ready_accounts.txt file found, skipping Redis session setup from file.');
-    }
-
-    config.accounts = accounts;
-    fs.writeFileSync('data/config.json', JSON.stringify(config, null, 2))
-
     logger.debug('Loaded config:' + JSON.stringify(accounts));
 
     // For each account, spawn enough workers so each worker gets a set number of threads.
     const workerPromises = [];
     for (const account of accounts) {
-        const { login, password, stickyProxy, rotatingProxy, proxyThreads } = account;
+        const { login, password, stickyProxy, rotatingProxy, proxyThreads, userAgent } = account;
         // Determine the number of workers needed (each handling a fixed number of threads)
         const numWorkers = Math.ceil(proxyThreads / 50);
         for (let i = 0; i < numWorkers; i++) {
             const threads = (i === numWorkers - 1) ? proxyThreads - (i * 50) : 50;
             const isPrimary = i === 0;
-            workerPromises.push(runWorker(login, password, stickyProxy, rotatingProxy, threads, isPrimary));
+            workerPromises.push(runWorker(login, password, stickyProxy, rotatingProxy, threads, isPrimary, userAgent));
             await randomDelay();
         }
     }

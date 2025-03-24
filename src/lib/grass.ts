@@ -50,10 +50,11 @@ export default class Grass {
     private totalPointsTimer?: NodeJS.Timeout;
     private isPrimary;
 
-    constructor(i: number, isPrimary: boolean) {
+    constructor(i: number, isPrimary: boolean, userAgent: string) {
         this.isPrimary = isPrimary;
         this.browserId = uuidv4();
         this.index = i;
+        this.userAgent = userAgent ? userAgent : this.userAgent;
     }
 
     /**

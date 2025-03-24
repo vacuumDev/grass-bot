@@ -5,4 +5,11 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--requirepass", "fhg384f3h387f383f30h43h84"]
+    volumes:
+      - ./redis-data:/data
+    command:
+      - redis-server
+      - --requirepass
+      - fhg384f3h387f383f30h43h84
+      - --appendonly
+      - "yes"
