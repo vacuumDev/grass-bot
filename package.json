@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "migration": "node dist/accounts-migration.js"
+    "migration": "node dist/accounts-migration.js",
+    "migration:old": "node dist/accounts-migration-old.js"
   },
   "keywords": [],
   "author": "",
