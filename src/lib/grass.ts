@@ -227,11 +227,18 @@ export default class Grass {
      */
     async connectWebSocket(destination: string, token: string): Promise<void> {
         this.setThreadState("connecting websocket");
+
+        if (this.ws) {
+            this.ws.removeAllListeners();
+            this.ws.terminate();
+        }
+
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
 
         return new Promise<void>((resolve, reject) => {
             try {
+
                 this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy), timeout: 20_000 });
 
                 this.ws.on("open", async () => {
@@ -460,6 +467,11 @@ export default class Grass {
             clearInterval(this.pingInterval);
             this.pingInterval = undefined;
         }
+
+        if (this.totalPointsTimer) {
+            clearTimeout(this.totalPointsTimer);
+            this.totalPointsTimer = undefined;
+        }
     }
 
     // Запуск периодических задач.
@@ -490,6 +502,9 @@ export default class Grass {
     }
     // Смена прокси.
     async changeProxy(): Promise<void> {
+        if (this.proxy?.destroy) {
+            this.proxy.destroy();
+        }
         logger.debug("Changing proxy...");
         this.currentProxyUrl = ProxyManager.getProxy();
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
