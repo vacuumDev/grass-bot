@@ -139,3 +139,4 @@ redis-data
 .DS_Store
 data/config.json
 data/ready_accounts.txt
+data/ready_accounts_old.txt
