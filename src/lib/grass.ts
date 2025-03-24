@@ -240,7 +240,7 @@ export default class Grass {
                     } catch (err) {
                         logger.debug("Reconnection failed:" + err.message);
                         this.setThreadState("reconnect retry");
-                        await delay(60000);
+                        await delay(1_000);
                         await this.triggerReconnect(false);
                     }
                     this.startPeriodicTasks();
@@ -476,7 +476,7 @@ export default class Grass {
             } catch (err) {
                 logger.debug("Reconnection failed:" + err.message);
                 this.setThreadState("reconnect retry");
-                await delay(60000);
+                await delay(1_000);
                 await this.triggerReconnect(false);
             }
         }, 120_000);
@@ -540,7 +540,7 @@ export default class Grass {
             logger.debug("Reconnection failed:" + error);
             this.setThreadState("reconnect retry");
             await randomDelay();
-            await delay(60000);
+            await delay(1_000);
             await this.triggerReconnect(false);
         }
     }
@@ -573,7 +573,7 @@ export default class Grass {
             this.setThreadState("mining error");
             logger.debug("Error during mining process:" + error);
             await randomDelay();
-            await delay(60000);
+            await delay(1_000);
             await this.triggerReconnect(false);
         }
     }
