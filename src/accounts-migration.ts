@@ -23,10 +23,11 @@ const main = async () => {
                     continue;
                 }
 
-                const stickyProxy = parts[4];
-                const accessToken = parts[5];
-                const userId = parts[6];
-                const userAgent = parts[7];
+                const password = parts[4];
+                const stickyProxy = parts[5];
+                const accessToken = parts[6];
+                const userId = parts[7];
+                const userAgent = parts[8];
                 try {
                     await RedisWorker.setSession(email as string, JSON.stringify({
                         accessToken: accessToken,
@@ -36,7 +37,8 @@ const main = async () => {
                         login: email,
                         proxyThreads: 200,
                         userAgent,
-                        stickyProxy
+                        stickyProxy,
+                        password
                     });
                     logger.debug(`Redis session set for ${email}`);
                 } catch (err) {
