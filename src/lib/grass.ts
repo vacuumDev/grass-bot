@@ -50,6 +50,7 @@ export default class Grass {
     private totalPoints: number = 0;
     private totalPointsTimer?: NodeJS.Timeout;
     private isPrimary;
+    private retryCount = 0;
 
     constructor(i: number, isPrimary: boolean, userAgent: string) {
         this.isPrimary = isPrimary;
@@ -550,6 +551,11 @@ export default class Grass {
             this.setThreadState("mining");
         } catch (error: any) {
             logger.debug("Reconnection failed:" + error);
+            this.retryCount++;
+            if(this.retryCount >= 5) {
+                await delay(60_000);
+                this.retryCount = 0;
+            }
             this.setThreadState("reconnect retry");
             await randomDelay();
             await delay(1_000);
