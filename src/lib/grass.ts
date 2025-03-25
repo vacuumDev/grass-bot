@@ -237,9 +237,9 @@ export default class Grass {
             this.ws.removeAllListeners('close');
             this.ws.removeAllListeners('error');
             this.ws.terminate();
-        }
 
-        this.ws = undefined;
+            this.ws = undefined;
+        }
 
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
@@ -334,9 +334,9 @@ export default class Grass {
                         this.ws.removeAllListeners('close');
                         this.ws.removeAllListeners('error');
                         this.ws.terminate();
-                    }
 
-                    this.ws = undefined;
+                        this.ws = undefined;
+                    }
                     reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
                 });
             } catch (err: any) {
@@ -480,7 +480,19 @@ export default class Grass {
     // Смена прокси.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
+
         this.currentProxyUrl = ProxyManager.getProxy();
+
+        const account = config.accounts.find((acc: any) => acc.login === this.email);
+        if (account) {
+            account.stickyProxy = this.currentProxyUrl;
+            fs.writeFileSync("data/config.json", JSON.stringify(config, null, 2), "utf8");
+            logger.debug(`Updated stickyProxy for ${this.email} in config.json`);
+        } else {
+            logger.debug(`No matching account found for ${this.email} — skipping config update`);
+        }
+
+
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
         const configAxios: AxiosRequestConfig = {
             baseURL: "https://api.getgrass.io",
@@ -494,13 +506,6 @@ export default class Grass {
         };
         this.grassApi = axios.create(configAxios);
         logger.debug(`Proxy changed to: ${this.currentProxyUrl}`);
-    }
-
-    // Обработка ошибок WebSocket (только закрываем соединение и выставляем флаг).
-    handleWebSocketError(): void {
-        if (this.ws) {
-            this.ws.close();
-        }
     }
 
     /**
