@@ -318,9 +318,6 @@ export default class Grass {
 
                 this.ws.on("error", (error: Error) => {
                     logger.debug("WebSocket error:" + error);
-                    if(this.ws) {
-                        this.ws.close();
-                    }
                 });
 
                 this.ws.on("close", (code: number, reason: Buffer) => {
