@@ -11,7 +11,6 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
-import * as crypto from "crypto";
 
 // Чтение конфига и получение диапазона задержки.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
@@ -239,16 +238,6 @@ export default class Grass {
      */
     async connectWebSocket(destination: string, token: string): Promise<void> {
         this.setThreadState("connecting websocket");
-
-        if (this.ws) {
-            this.ws.removeAllListeners('open');
-            this.ws.removeAllListeners('message');
-            this.ws.removeAllListeners('close');
-            this.ws.removeAllListeners('error');
-            this.ws.terminate();
-
-            this.ws = undefined;
-        }
 
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
