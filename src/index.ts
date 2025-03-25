@@ -31,6 +31,14 @@ function formatDuration(ms: number): string {
 const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
 let accounts = config.accounts;
 
+// Delay range from config if needed
+const [minDelay, maxDelay] = config.delay || [100, 10000];
+
+function randomDelay(): Promise<void> {
+    const ms = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // Function to run a worker process for given credentials and thread count
 const runWorker = (login: string, password: string, stickyProxy: string, rotatingProxy: string, threads: number, isPrimary: boolean, userAgent: string) => {
     return new Promise((resolve, reject) => {
@@ -88,6 +96,7 @@ const main = async () => {
             const threads = (i === numWorkers - 1) ? proxyThreads - (i * 50) : 50;
             const isPrimary = i === 0;
             workerPromises.push(runWorker(login, password, stickyProxy, rotatingProxy, threads, isPrimary, userAgent));
+            await randomDelay();
         }
     }
 
