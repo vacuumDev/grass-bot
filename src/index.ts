@@ -45,7 +45,7 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
         const workerPath = path.join(process.cwd(), 'dist/worker.js');
         const worker = fork(workerPath);
 
-        worker.on('message', (msg) => {
+        worker.on('message', (msg: any) => {
             if (msg.type === 'threadHeartbeat') {
                 if (!accountStartTimes.has(msg.email)) {
                     accountStartTimes.set(msg.email, msg.timestamp);
@@ -126,7 +126,7 @@ function scheduleStatsUpdate() {
 
         for (const [, status] of workerStatuses) {
             const { email, state, pingCount, threadId } = status;
-            const accCfg = accounts.find(acc => acc.login === email) || {};
+            const accCfg = accounts.find((acc: any) => acc.login === email) || {};
             if (!grouped.has(email)) {
                 grouped.set(email, {
                     startTime: accountStartTimes.get(email) ?? now,

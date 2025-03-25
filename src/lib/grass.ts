@@ -44,19 +44,21 @@ export default class Grass {
     // Текущее состояние потока
     private currentThreadState: string = "idle";
     private index: number = 0;
-    private email: string;
-    private rotatingProxy: string;
+    private email!: string;
+    private rotatingProxy!: string;
 
     private totalPoints: number = 0;
     private totalPointsTimer?: NodeJS.Timeout;
     private isPrimary;
     private retryCount = 0;
+    private isLowAmount: boolean;
 
-    constructor(i: number, isPrimary: boolean, userAgent: string) {
+    constructor(i: number, isPrimary: boolean, userAgent: string, isLowAmount: boolean) {
         this.isPrimary = isPrimary;
         this.browserId = uuidv4();
         this.index = i;
         this.userAgent = userAgent ? userAgent : this.userAgent;
+        this.isLowAmount = isLowAmount;
     }
 
     /**
@@ -81,7 +83,7 @@ export default class Grass {
     async login(email: string, password: string, stickyProxy: string): Promise<void> {
         this.setThreadState("logging in");
         this.currentProxyUrl = stickyProxy ? stickyProxy : ProxyManager.getProxy();
-        this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
+        this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
 
         try {
             const session = await RedisWorker.getSession(email);
@@ -246,7 +248,7 @@ export default class Grass {
                     this.setThreadState("mining");
                     try {
                         this.sendPing();
-                    } catch (err) {
+                    } catch (err: any) {
                         logger.debug("Reconnection failed:" + err.message);
                         this.setThreadState("reconnect retry");
                         await delay(1_000);
@@ -483,23 +485,25 @@ export default class Grass {
             try {
                 await randomDelay();
                 this.sendPing();
-            } catch (err) {
+            } catch (err: any) {
                 logger.debug("Reconnection failed:" + err.message);
                 this.setThreadState("reconnect retry");
                 await delay(1_000);
                 await this.triggerReconnect(false);
             }
         }, 120_000);
-        // setTimeout(async () => {
-        //     await randomDelay();
-        //     const scoreOk = await this.checkMiningScore();
-        //     if (!scoreOk) {
-        //         this.stopPeriodicTasks();
-        //         if (this.ws) {
-        //             this.ws.close();
-        //         }
-        //     }
-        // }, 180_000 * 20);
+        setTimeout(async () => {
+            await randomDelay();
+            const scoreOk = await this.checkMiningScore();
+            if (!scoreOk) {
+                this.stopPeriodicTasks();
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws.removeAllListeners()
+                    this.ws.terminate();
+                }
+            }
+        }, 180_000 * 20);
     }
     // Смена прокси.
     async changeProxy(): Promise<void> {
@@ -508,7 +512,7 @@ export default class Grass {
         }
         logger.debug("Changing proxy...");
         this.currentProxyUrl = ProxyManager.getProxy();
-        this.proxy = new HttpsProxyAgent(this.currentProxyUrl);
+        this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
         const configAxios: AxiosRequestConfig = {
             baseURL: "https://api.getgrass.io",
             headers: {
