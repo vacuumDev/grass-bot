@@ -557,7 +557,6 @@ export default class Grass {
             await randomDelay();
 
             if(this.isPrimary) {
-                await this.updateTotalPoints();
                 this.scheduleTotalPointsUpdate();
             }
 
