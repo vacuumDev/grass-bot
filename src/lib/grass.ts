@@ -245,10 +245,13 @@ export default class Grass {
         return new Promise<void>((resolve, reject) => {
             try {
 
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy), handshakeTimeout: 20_000 });
+                const timeout = setTimeout(() => reject(new Error('Can not connect after 20 seconds')), 20_000);
+
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
 
                 this.ws.on("open", async () => {
                     this.setThreadState("mining");
+                    clearTimeout(timeout);
                     try {
                         this.sendPing();
                     } catch (err: any) {
