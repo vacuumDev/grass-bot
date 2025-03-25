@@ -575,6 +575,13 @@ export default class Grass {
 
         try {
             await this.login(email, password, stickyProxy);
+        } catch (err) {
+            await this.changeProxy();
+            await delay(1_000);
+            await this.startMining(email, password, stickyProxy, rotatingProxy);
+        }
+
+        try {
             await randomDelay();
 
             if(this.isPrimary) {
