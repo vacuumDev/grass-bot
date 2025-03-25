@@ -331,7 +331,6 @@ export default class Grass {
                         this.ws.removeAllListeners('message');
                         this.ws.removeAllListeners('close');
                         this.ws.removeAllListeners('error');
-                        this.ws.terminate();
 
                         this.ws = undefined;
                     }
