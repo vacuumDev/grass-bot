@@ -245,7 +245,7 @@ export default class Grass {
         return new Promise<void>((resolve, reject) => {
             try {
 
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy), timeout: 20_000 });
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy), handshakeTimeout: 20_000 });
 
                 this.ws.on("open", async () => {
                     this.setThreadState("mining");
