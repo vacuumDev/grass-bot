@@ -323,23 +323,10 @@ export default class Grass {
                     logger.debug("WebSocket error:" + error);
                 });
 
-                this.ws.on('unexpected-response', (_req, res) => {
-                    clearTimeout(timeout);
-                    reject(new Error(`Unexpected server response: ${res.statusCode}`));
-                });
-
                 this.ws.on("close", (code: number, reason: Buffer) => {
                     clearTimeout(timeout);
                     logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
                     this.stopPeriodicTasks();
-                    if (this.ws) {
-                        this.ws.removeAllListeners('open');
-                        this.ws.removeAllListeners('message');
-                        this.ws.removeAllListeners('close');
-                        this.ws.removeAllListeners('error');
-
-                        this.ws = undefined;
-                    }
                     reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
                 });
             } catch (err: any) {
