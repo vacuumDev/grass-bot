@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "prestart": "tsc && npm run migration",
+    "prestart": "tsc",
     "start": "node dist/index.js",
     "migration": "node dist/accounts-migration.js"
   },
