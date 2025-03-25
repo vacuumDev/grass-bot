@@ -374,8 +374,8 @@ export default class Grass {
         try {
             await randomDelay();
             const response = await axios.get(url, {
-                httpAgent: this.proxy,
-                httpsAgent: this.proxy,
+                httpAgent: new HttpsProxyAgent(this.rotatingProxy),
+                httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
                 timeout: 20000,
             });
             const encodedBody = Buffer.from(JSON.stringify(response.data)).toString("base64");
