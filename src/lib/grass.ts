@@ -16,6 +16,14 @@ import UserAgent from "user-agents";
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
 const delayRange: [number, number] = config.delay;
 
+function generateRandom12Hex() {
+    let hex = '';
+    for (let i = 0; i < 12; i++) {
+        hex += Math.floor(Math.random() * 16).toString(16);
+    }
+    return hex;
+}
+
 function randomDelay(): Promise<void> {
     const [min, max] = delayRange;
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -82,7 +90,7 @@ export default class Grass {
     // Логин и настройка экземпляра axios.
     async login(email: string, password: string, stickyProxy: string): Promise<void> {
         this.setThreadState("logging in");
-        this.currentProxyUrl = stickyProxy ? stickyProxy : ProxyManager.getProxy();
+        this.currentProxyUrl = stickyProxy ? stickyProxy.replace('{ID}', generateRandom12Hex()) : ProxyManager.getProxy();
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
 
         try {
