@@ -495,17 +495,17 @@ export default class Grass {
                 await this.triggerReconnect(false);
             }
         }, 120_000);
-        setTimeout(async () => {
-            await randomDelay();
-            const scoreOk = await this.checkMiningScore();
-            if (!scoreOk) {
-                this.stopPeriodicTasks();
-                if (this.ws) {
-                    this.ws.close();
-                    this.ws.removeAllListeners();
-                }
-            }
-        }, 180_000 * 20);
+        // setTimeout(async () => {
+        //     await randomDelay();
+        //     const scoreOk = await this.checkMiningScore();
+        //     if (!scoreOk) {
+        //         this.stopPeriodicTasks();
+        //         if (this.ws) {
+        //             this.ws.close();
+        //             this.ws.removeAllListeners();
+        //         }
+        //     }
+        // }, 180_000 * 20);
     }
     // Смена прокси.
     async changeProxy(): Promise<void> {
