@@ -232,8 +232,14 @@ export default class Grass {
         this.setThreadState("connecting websocket");
 
         if (this.ws) {
-            this.ws.removeAllListeners();
+            this.ws.removeAllListeners('open');
+            this.ws.removeAllListeners('message');
+            this.ws.removeAllListeners('close');
+            this.ws.removeAllListeners('error');
+            this.ws.terminate();
         }
+
+        this.ws = undefined;
 
         const wsUrl = `ws://${destination}/?token=${token}`;
         const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
@@ -322,33 +328,21 @@ export default class Grass {
                 this.ws.on("close", (code: number, reason: Buffer) => {
                     logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
                     this.stopPeriodicTasks();
+                    if (this.ws) {
+                        this.ws.removeAllListeners('open');
+                        this.ws.removeAllListeners('message');
+                        this.ws.removeAllListeners('close');
+                        this.ws.removeAllListeners('error');
+                        this.ws.terminate();
+                    }
+
+                    this.ws = undefined;
                     reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
                 });
             } catch (err: any) {
                 reject(err);
             }
         });
-    }
-
-    // Отправка информации о браузере.
-    sendBrowserInfo(): void {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const browserInfo = {
-                id: uuidv4(),
-                origin_action: "AUTH",
-                result: {
-                    browser_id: this.browserId,
-                    user_id: this.userId,
-                    timestamp: Math.floor(Date.now() / 1000),
-                    device_type: "extension",
-                    version: "5.1.1",
-                    extension_id: "ilehaonighjijnmpnagapkhpcdbhclfg",
-                },
-            };
-            this.ws.send(JSON.stringify(browserInfo));
-        } else {
-            logger.debug("WebSocket is not open. Cannot send browser info.");
-        }
     }
 
     // Отправка PING-сообщения.
@@ -405,30 +399,6 @@ export default class Grass {
         } catch (error: any) {
             logger.debug("Error performing HTTP request:" + error);
             throw error;
-        }
-    }
-
-    // Проверка mining score.
-    async checkMiningScore(): Promise<boolean> {
-        try {
-            await randomDelay();
-            const res = await this.grassApi.get(`/retrieveDevice?input=%7B%22deviceId%22:%22${this.browserId}%22%7D`, { timeout: 20000 });
-            const device = res.data.result.data;
-            logger.debug('Devices: ' + JSON.stringify(device));
-            let currentScore = 0;
-            if (device) {
-                currentScore = device.ipScore;
-            }
-            logger.debug(`Network Score for device ${this.browserId}: ${currentScore}%`);
-
-            if (currentScore === 0 || currentScore < this.minScoreThreshold) {
-                logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%).`);
-                return false;
-            }
-            return true;
-        } catch (error: any) {
-            logger.debug("Error checking mining score:" + error);
-            return false;
         }
     }
 
