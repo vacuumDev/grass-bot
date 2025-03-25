@@ -11,6 +11,7 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
+import * as crypto from "crypto";
 
 // Чтение конфига и получение диапазона задержки.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
@@ -489,7 +490,19 @@ export default class Grass {
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
 
-        this.currentProxyUrl = ProxyManager.getProxy();
+        if (this.currentProxyUrl) {
+            const sidRegex = /sid-[0-9a-f]{12}4(?=-filter)/;
+            const newSid = generateRandom12Hex() + '4';
+
+            if (sidRegex.test(this.currentProxyUrl)) {
+                this.currentProxyUrl = this.currentProxyUrl.replace(sidRegex, `sid-${newSid}`);
+                logger.debug(`Generated new SID: ${newSid}`);
+            } else {
+                this.currentProxyUrl = ProxyManager.getProxy();
+            }
+        } else {
+            this.currentProxyUrl = ProxyManager.getProxy();
+        }
 
         const account = config.accounts.find((acc: any) => acc.login === this.email);
         if (account) {
@@ -562,6 +575,7 @@ export default class Grass {
 
         try {
             await this.login(email, password, stickyProxy);
+            await this.changeProxy();
             await randomDelay();
 
             if(this.isPrimary) {
