@@ -575,7 +575,6 @@ export default class Grass {
 
         try {
             await this.login(email, password, stickyProxy);
-            await this.changeProxy();
             await randomDelay();
 
             if(this.isPrimary) {
