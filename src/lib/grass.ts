@@ -327,6 +327,11 @@ export default class Grass {
                     logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
                     this.stopPeriodicTasks();
                     if (this.ws) {
+                        this.ws.removeAllListeners('open');
+                        this.ws.removeAllListeners('message');
+                        this.ws.removeAllListeners('close');
+                        this.ws.removeAllListeners('error');
+
                         this.ws = undefined;
                     }
                     reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
