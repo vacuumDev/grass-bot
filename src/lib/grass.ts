@@ -233,7 +233,6 @@ export default class Grass {
 
         if (this.ws) {
             this.ws.removeAllListeners();
-            this.ws.terminate();
         }
 
         const wsUrl = `ws://${destination}/?token=${token}`;
@@ -315,6 +314,9 @@ export default class Grass {
 
                 this.ws.on("error", (error: Error) => {
                     logger.debug("WebSocket error:" + error);
+                    if(this.ws) {
+                        this.ws.close();
+                    }
                 });
 
                 this.ws.on("close", (code: number, reason: Buffer) => {
@@ -448,6 +450,7 @@ export default class Grass {
             }
         } catch (error: any) {
             logger.debug(`Failed to update totalPoints: ${error}`);
+            throw new Error('can not receive user data');
         }
     }
 
@@ -458,7 +461,12 @@ export default class Grass {
         const nextDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 
         this.totalPointsTimer = setTimeout(async () => {
-            await this.updateTotalPoints();
+            try {
+                await this.updateTotalPoints();
+            } catch (err) {
+                await this.changeProxy();
+                await this.updateTotalPoints();
+            }
             this.scheduleTotalPointsUpdate();
         }, nextDelay);
     }
@@ -469,11 +477,6 @@ export default class Grass {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
             this.pingInterval = undefined;
-        }
-
-        if (this.totalPointsTimer) {
-            clearTimeout(this.totalPointsTimer);
-            this.totalPointsTimer = undefined;
         }
     }
 
@@ -499,17 +502,13 @@ export default class Grass {
                 this.stopPeriodicTasks();
                 if (this.ws) {
                     this.ws.close();
-                    this.ws.removeAllListeners()
-                    this.ws.terminate();
+                    this.ws.removeAllListeners();
                 }
             }
         }, 180_000 * 20);
     }
     // Смена прокси.
     async changeProxy(): Promise<void> {
-        if (this.proxy?.destroy) {
-            this.proxy.destroy();
-        }
         logger.debug("Changing proxy...");
         this.currentProxyUrl = ProxyManager.getProxy();
         this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
@@ -556,7 +555,7 @@ export default class Grass {
         } catch (error: any) {
             logger.debug("Reconnection failed:" + error);
             this.retryCount++;
-            if(this.retryCount >= 5) {
+            if(this.retryCount >= 10) {
                 await delay(60_000);
                 this.retryCount = 0;
             }
