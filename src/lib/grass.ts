@@ -320,6 +320,12 @@ export default class Grass {
                     logger.debug("WebSocket error:" + error);
                 });
 
+                this.ws.on("unexpected-response", (req, res) => {
+                    logger.debug(`WebSocket unexpected-response. Status code: ${res.statusCode}`);
+                    clearTimeout(timeout);
+                    reject(new Error(`WebSocket handshake unexpected-response: ${res.statusCode}`));
+                });
+
                 this.ws.on("close", (code: number, reason: Buffer) => {
                     clearTimeout(timeout);
                     logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
