@@ -18,9 +18,9 @@ const processGrassAccount = async (login: string, password: string, stickyProxy:
     for (let i = 0; i < proxyThreads; i++) {
         const isLowAmount = isPrimary && proxyThreads < 30;
         const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-        await delay(ms)
         const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount);
         promises.push(grass.startMining(login, password, stickyProxy, rotatingProxy));
+        await delay(ms)
     }
     // Prevent the worker from exiting immediately (if needed)
     await Promise.all(promises);

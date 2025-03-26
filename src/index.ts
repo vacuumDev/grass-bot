@@ -1,4 +1,3 @@
-// index.ts
 import { fork } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -32,7 +31,7 @@ const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
 let accounts = config.accounts;
 
 // Delay range from config if needed
-const [minDelay, maxDelay] = config.delay || [100, 10000];
+const [minDelay, maxDelay] = config.accDelay || [100, 10000];
 
 function randomDelay(): Promise<void> {
     const ms = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
@@ -90,14 +89,8 @@ const main = async () => {
     const workerPromises = [];
     for (const account of accounts) {
         const { login, password, stickyProxy, rotatingProxy, proxyThreads, userAgent } = account;
-        // Determine the number of workers needed (each handling a fixed number of threads)
-        const numWorkers = Math.ceil(proxyThreads / 50);
-        for (let i = 0; i < numWorkers; i++) {
-            const threads = (i === numWorkers - 1) ? proxyThreads - (i * 50) : 50;
-            const isPrimary = i === 0;
-            workerPromises.push(runWorker(login, password, stickyProxy, rotatingProxy, threads, isPrimary, userAgent));
-            await randomDelay();
-        }
+        workerPromises.push(runWorker(login, password, stickyProxy, rotatingProxy, proxyThreads, true, userAgent));
+        await randomDelay();
     }
 
     try {
