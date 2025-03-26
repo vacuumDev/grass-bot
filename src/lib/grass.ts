@@ -264,7 +264,6 @@ export default class Grass {
 
                 this.ws.on("message", async (data: WebSocket.Data) => {
                     const messageStr = data.toString();
-                    logger.debug(`Received message: ${messageStr}`);
                     try {
                         const message = JSON.parse(messageStr);
                         if (message.action === "HTTP_REQUEST") {
@@ -277,7 +276,6 @@ export default class Grass {
                                     result: result,
                                 };
                                 await this.sendMessage(responseMessage);
-                                logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                             } catch (err: any) {
                                 // Пытаемся выполнить запрос ещё раз перед выбросом ошибки.
                                 try {
@@ -288,7 +286,6 @@ export default class Grass {
                                         result: result,
                                     };
                                     await this.sendMessage(responseMessage);
-                                    logger.debug(`Sending HTTP_REQUEST with message: ${JSON.stringify(responseMessage)}`);
                                 } catch (err: any) {
                                     logger.debug("Error during HTTP_REQUEST:" + err);
                                     reject(err);
