@@ -253,10 +253,16 @@ export default class Grass {
                     try {
                         this.sendPing();
                     } catch (err: any) {
-                        logger.debug("Reconnection failed:" + err.message);
-                        this.setThreadState("reconnect retry");
+                        logger.debug("Ping send error:" + err.message);
+                        this.setThreadState("error ping sending");
                         await delay(1_000);
-                        await this.triggerReconnect(false);
+                        this.stopPeriodicTasks();
+                        if(this.ws) {
+                            this.ws.close();
+                        } else {
+                            reject(err);
+                        }
+                        return;
                     }
                     this.startPeriodicTasks();
                     logger.debug("WebSocket connection opened.");
