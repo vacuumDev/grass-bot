@@ -526,11 +526,6 @@ export default class Grass {
             this.setThreadState("mining");
         } catch (error: any) {
             logger.debug("Reconnection failed:" + error);
-            this.retryCount++;
-            if(this.retryCount >= 10) {
-                await delay(60_000);
-                this.retryCount = 0;
-            }
             this.setThreadState("reconnect retry");
             await randomDelay();
             await delay(1_000);
