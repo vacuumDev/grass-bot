@@ -168,7 +168,7 @@ function scheduleStatsUpdate() {
         console.log(`Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints}`);
 
         scheduleStatsUpdate();
-    }, 60_000);
+    }, 5_000);
 }
 
 scheduleStatsUpdate();
