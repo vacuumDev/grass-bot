@@ -305,7 +305,7 @@ export default class Grass {
                                 origin_action: "PONG",
                             };
                             await this.sendMessage(pongResponse);
-                            logger.debug(`Sent pong message with id ${message.id}`);
+                            // logger.debug(`Sent pong message with id ${message.id}`);
                         } else if (message.action === "MINING_REWARD") {
                             // Обработка сообщения о награде за майнинг.
                             const points = message.data?.points || 0;
