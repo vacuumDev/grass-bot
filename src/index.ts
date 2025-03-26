@@ -119,7 +119,7 @@ function scheduleStatsUpdate() {
 
 
         workerStatuses.forEach((status, workerId) => {
-            if (now - status.lastUpdate > 480_000) {
+            if (now - status.lastUpdate > 240_000) {
                 status.state = 'inactive';
                 logger.debug(`Worker ${workerId} marked as inactive due to inactivity.`);
             }

@@ -257,11 +257,7 @@ export default class Grass {
                         this.setThreadState("error ping sending");
                         await delay(1_000);
                         this.stopPeriodicTasks();
-                        if(this.ws) {
-                            this.ws.close();
-                        } else {
-                            reject(err);
-                        }
+                        reject(err);
                         return;
                     }
                     this.startPeriodicTasks();
@@ -522,6 +518,10 @@ export default class Grass {
         this.browserId = uuidv4();
         await randomDelay();
 
+        if(this.ws) {
+            this.ws.close();
+        }
+
         if (needProxyChange) {
             await this.changeProxy();
         }
@@ -532,6 +532,11 @@ export default class Grass {
             this.setThreadState("mining");
         } catch (error: any) {
             logger.debug("Reconnection failed:" + error);
+            this.retryCount++;
+            if(this.retryCount >= 10) {
+                await delay(30_000);
+                this.retryCount = 0;
+            }
             this.setThreadState("reconnect retry");
             await randomDelay();
             await delay(1_000);
