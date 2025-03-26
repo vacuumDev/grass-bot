@@ -107,7 +107,7 @@ export default class Grass {
                     },
                     httpsAgent: this.proxy,
                     httpAgent: this.proxy,
-                    timeout: 20000,
+                    timeout: 7500,
                 };
 
                 this.grassApi = axios.create(config);
@@ -124,7 +124,7 @@ export default class Grass {
                     },
                     httpsAgent: this.proxy,
                     httpAgent: this.proxy,
-                    timeout: 20000,
+                    timeout: 7500,
                 };
 
                 this.grassApi = axios.create(config);
@@ -143,7 +143,7 @@ export default class Grass {
                 {
                     httpsAgent: this.proxy,
                     httpAgent: this.proxy,
-                    timeout: 20000,
+                    timeout: 7500,
                 }
             );
             this.accessToken = res.data.result.data.accessToken;
@@ -157,7 +157,7 @@ export default class Grass {
                 },
                 httpsAgent: this.proxy,
                 httpAgent: this.proxy,
-                timeout: 20000,
+                timeout: 7500,
             };
 
             this.grassApi = axios.create(configAxios);
@@ -215,7 +215,7 @@ export default class Grass {
             const res = await axios.post("https://director.getgrass.io/checkin", data, {
                 httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
                 httpAgent: new HttpsProxyAgent(this.rotatingProxy),
-                timeout: 20000,
+                timeout: 7500,
             });
             const responseData = res.data;
             if (!responseData.destinations || responseData.destinations.length === 0) {
@@ -243,7 +243,7 @@ export default class Grass {
         return new Promise<void>((resolve, reject) => {
             try {
 
-                const timeout = setTimeout(() => reject(new Error('Can not connect after 20 seconds')), 20_000);
+                const timeout = setTimeout(() => reject(new Error('Can not connect after 7.5 seconds')), 7500);
 
                 this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(this.rotatingProxy) });
 
@@ -369,7 +369,7 @@ export default class Grass {
             const response = await axios.get(url, {
                 httpAgent: new HttpsProxyAgent(this.rotatingProxy),
                 httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
-                timeout: 20000,
+                timeout: 7500,
             });
             const encodedBody = Buffer.from(JSON.stringify(response.data)).toString("base64");
             const headersObj: Record<string, string> = {};
@@ -501,7 +501,7 @@ export default class Grass {
             },
             httpsAgent: this.proxy,
             httpAgent: this.proxy,
-            timeout: 20000,
+            timeout: 7500,
         };
         this.grassApi = axios.create(configAxios);
         logger.debug(`Proxy changed to: ${this.currentProxyUrl}`);
