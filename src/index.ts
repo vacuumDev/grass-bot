@@ -117,6 +117,14 @@ function scheduleStatsUpdate() {
             states: string[];
         }>();
 
+
+        workerStatuses.forEach((status, workerId) => {
+            if (now - status.lastUpdate > 130_000) {
+                status.state = 'inactive';
+                logger.debug(`Worker ${workerId} marked as inactive due to inactivity.`);
+            }
+        });
+
         for (const [, status] of workerStatuses) {
             const { email, state, pingCount, threadId } = status;
             const accCfg = accounts.find((acc: any) => acc.login === email) || {};
