@@ -212,10 +212,9 @@ export default class Grass {
                 deviceType: "extension",
             };
             await randomDelay();
-            const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
             const res = await axios.post("https://director.getgrass.io/checkin", data, {
-                httpsAgent: new HttpsProxyAgent(rotatingProxy),
-                httpAgent: new HttpsProxyAgent(rotatingProxy),
+                httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
+                httpAgent: new HttpsProxyAgent(this.rotatingProxy),
                 timeout: 20000,
             });
             const responseData = res.data;
@@ -240,14 +239,13 @@ export default class Grass {
         this.setThreadState("connecting websocket");
 
         const wsUrl = `ws://${destination}/?token=${token}`;
-        const rotatingProxy = this.rotatingProxy ? this.rotatingProxy : ProxyManager.getProxy(true);
 
         return new Promise<void>((resolve, reject) => {
             try {
 
                 const timeout = setTimeout(() => reject(new Error('Can not connect after 20 seconds')), 20_000);
 
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(rotatingProxy) });
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(this.rotatingProxy) });
 
                 this.ws.on("open", async () => {
                     this.setThreadState("mining");
@@ -553,13 +551,15 @@ export default class Grass {
 
         if(rotatingProxy)
             this.rotatingProxy = rotatingProxy;
+        else
+            this.rotatingProxy = ProxyManager.getProxy(true);
 
         try {
             await this.login(email, password, stickyProxy);
         } catch (err) {
             await this.changeProxy();
             await delay(1_000);
-            await this.startMining(email, password, stickyProxy, rotatingProxy);
+            await this.startMining(email, password, stickyProxy, this.rotatingProxy);
         }
 
         try {
