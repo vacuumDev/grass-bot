@@ -413,7 +413,7 @@ export default class Grass {
             }
         } catch (error: any) {
             logger.debug(`Failed to update totalPoints: ${error}`);
-            throw new Error('can not receive user data');
+            await this.changeProxy();
         }
     }
 
@@ -424,12 +424,7 @@ export default class Grass {
         const nextDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 
         this.totalPointsTimer = setTimeout(async () => {
-            try {
-                await this.updateTotalPoints();
-            } catch (err) {
-                await this.changeProxy();
-                await this.updateTotalPoints();
-            }
+            await this.updateTotalPoints();
             this.scheduleTotalPointsUpdate();
         }, nextDelay);
     }
