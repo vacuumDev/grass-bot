@@ -16,6 +16,24 @@ io.init({
 const workerStatuses = new Map<string, any>();
 const accountStartTimes = new Map<string, number>();
 const accountPoints = new Map<string, number>();
+const snapshotPoints = new Map<string, number>();
+const accountRegions = new Map<string, string>();
+
+let lastSnapshotTime = 0;
+const MS_IN_24H = 24 * 60 * 60 * 1000;
+
+let hasSnapshotTaken = false;
+
+
+function takeSnapshot() {
+    const now = Date.now();
+    accountPoints.forEach((points, email) => {
+        snapshotPoints.set(email, points);
+    });
+    lastSnapshotTime = now;
+    logger.debug(`Snapshot taken at ${new Date(now).toISOString()}`);
+}
+
 
 function formatDuration(ms: number): string {
     const totalMinutes = Math.floor(ms / 60000);
@@ -55,9 +73,11 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
                     lastUpdate: msg.timestamp,
                     threadId: msg.threadId,
                     email: msg.email,
-                    pingCount: msg.pingCount
+                    pingCount: msg.pingCount,
+                    region: msg.region
                 };
                 workerStatuses.set(msg.workerId, status);
+                accountRegions.set(msg.email, msg.region)
             } else if(msg.type === 'updatePoints') {
                 accountPoints.set(msg.email, msg.pingCount);
             }
@@ -150,17 +170,28 @@ function scheduleStatsUpdate() {
         let totalPoints = 0;
         let totalThreads = 0;
 
+        if(grouped.size === accounts.length && !hasSnapshotTaken) {
+            takeSnapshot();
+            hasSnapshotTaken = true;
+        }
+
         for (const [, acc] of grouped) {
             const workingTime = formatDuration(now - acc.startTime);
             const accountState = acc.states.includes('mining')
                 ? 'mining'
                 : acc.states[acc.states.length - 1];
 
+            const current = accountPoints.get(acc.email) || 0;
+            const snapshot = snapshotPoints.get(acc.email) || 0;
+            const change24h = current - snapshot;
+
             rows.push({
                 'Start Time': new Date(acc.startTime).toISOString(),
                 'Email': acc.email,
                 'State': accountState,
                 'Points': accountPoints.get(acc.email) || 0,
+                '24h Change': change24h >= 0 ? `+${change24h}` : `${change24h}`,
+                'Targeting country': accountRegions.get(acc.email) || "N/A",
                 'Threads Working': `${acc.threadsWorking}/${acc.threadsTotal}`,
                 'Working Time': workingTime,
             });
@@ -179,5 +210,6 @@ function scheduleStatsUpdate() {
     }, 5_000);
 }
 
+setInterval(takeSnapshot, MS_IN_24H);
 scheduleStatsUpdate();
 

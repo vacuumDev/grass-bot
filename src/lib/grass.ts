@@ -60,6 +60,7 @@ export default class Grass {
     private isPrimary;
     private retryCount = 0;
     private isLowAmount: boolean;
+    private isGlobalProxy!: boolean;
 
     constructor(i: number, isPrimary: boolean, userAgent: string, isLowAmount: boolean) {
         this.isPrimary = isPrimary;
@@ -67,6 +68,22 @@ export default class Grass {
         this.index = i;
         this.userAgent = userAgent ? userAgent : this.userAgent;
         this.isLowAmount = isLowAmount;
+    }
+
+    private getRegion(): string {
+        if (!this.rotatingProxy) {
+            return "N/A";
+        }
+
+        const match = this.rotatingProxy.match(/region-([a-z]+)/i);
+        if (!match || !match[1]) {
+            return "N/A";
+        }
+        let region = match[1].toUpperCase();
+        if(this.isGlobalProxy)
+            region += " (Global)"
+
+        return region;
     }
 
     /**
@@ -82,7 +99,8 @@ export default class Grass {
                 state: this.currentThreadState,
                 email: this.email,
                 pingCount: this.totalPoints,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                region: this.getRegion()
             });
         }
     }
@@ -520,6 +538,7 @@ export default class Grass {
         await randomDelay();
 
         if(this.ws) {
+            this.ws.removeAllListeners();
             this.ws.close();
         }
 
@@ -553,10 +572,13 @@ export default class Grass {
         this.setThreadState("starting mining");
         this.email = email;
 
-        if(rotatingProxy)
+        if(rotatingProxy) {
             this.rotatingProxy = rotatingProxy;
-        else
+            this.isGlobalProxy = false;
+        } else {
             this.rotatingProxy = ProxyManager.getProxy(true);
+            this.isGlobalProxy = true;
+        }
 
         try {
             await this.login(email, password, stickyProxy);
@@ -570,6 +592,7 @@ export default class Grass {
             await randomDelay();
 
             if(this.isPrimary) {
+                await this.updateTotalPoints();
                 this.scheduleTotalPointsUpdate();
             }
 
