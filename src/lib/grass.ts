@@ -260,14 +260,10 @@ export default class Grass {
 
         return new Promise<void>((resolve, reject) => {
             try {
-
-                const timeout = setTimeout(() => reject(new Error('Can not connect after 7.5 seconds')), 7500);
-
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(this.rotatingProxy) });
+                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(this.rotatingProxy), handshakeTimeout: 7500 });
 
                 this.ws.on("open", async () => {
                     this.setThreadState("mining");
-                    clearTimeout(timeout);
                     try {
                         this.sendPing();
                     } catch (err: any) {
@@ -340,12 +336,10 @@ export default class Grass {
 
                 this.ws.on("unexpected-response", (req, res) => {
                     logger.debug(`WebSocket unexpected-response. Status code: ${res.statusCode}`);
-                    clearTimeout(timeout);
                     reject(new Error(`WebSocket handshake unexpected-response: ${res.statusCode}`));
                 });
 
                 this.ws.on("close", (code: number, reason: Buffer) => {
-                    clearTimeout(timeout);
                     logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
                     this.stopPeriodicTasks();
                     reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));

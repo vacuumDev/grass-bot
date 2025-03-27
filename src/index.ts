@@ -169,6 +169,7 @@ function scheduleStatsUpdate() {
         const rows: any[] = [];
         let totalPoints = 0;
         let totalThreads = 0;
+        let totalChange24h = 0;
 
         if(grouped.size === accounts.length && !hasSnapshotTaken) {
             takeSnapshot();
@@ -198,13 +199,14 @@ function scheduleStatsUpdate() {
 
             totalPoints += accountPoints.get(acc.email) || 0;
             totalThreads += acc.threadsWorking;
+            totalChange24h += change24h;
         }
         if(!config.debug) {
             readline.cursorTo(process.stdout, 0, 0);
             readline.clearScreenDown(process.stdout);
         }
         console.table(rows);
-        console.log(`Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints}`);
+        console.log(`Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`);
 
         scheduleStatsUpdate();
     }, 5_000);
