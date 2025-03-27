@@ -539,17 +539,9 @@ export default class Grass {
 
         if (this.ws) {
             this.ws.removeAllListeners();
+            this.ws.on('error', () => {/* no-op */});
 
-            this.ws.on('error', () => {});
-
-            // 3) now close or terminate
-            if (this.ws.readyState === WebSocket.OPEN) {
-                this.ws.close();
-            } else {
-                this.ws.terminate();
-            }
-
-            this.ws = undefined;
+            this.ws.close();
         }
 
 
