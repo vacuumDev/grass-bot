@@ -542,6 +542,8 @@ export default class Grass {
             this.ws.on('error', () => {/* no-op */});
 
             this.ws.close();
+
+            this.ws = undefined;
         }
 
 
