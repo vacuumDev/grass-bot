@@ -537,10 +537,16 @@ export default class Grass {
         this.browserId = uuidv4();
         await randomDelay();
 
-        if(this.ws) {
-            this.ws.removeAllListeners();
+        if (this.ws) {
+            this.ws.on('error', () => {/* no-op */});
+
+            this.ws.removeAllListeners('message');
+            this.ws.removeAllListeners('open');
+            this.ws.removeAllListeners('close');
+
             this.ws.close();
         }
+
 
         if (needProxyChange) {
             await this.changeProxy();
