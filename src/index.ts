@@ -190,7 +190,7 @@ function scheduleStatsUpdate() {
                 'Email': acc.email,
                 'State': accountState,
                 'Points': accountPoints.get(acc.email) || 0,
-                '24h Change': change24h >= 0 ? `+${change24h}` : `${change24h}`,
+                '24h Change': change24h,
                 'Targeting country': accountRegions.get(acc.email) || "N/A",
                 'Threads Working': `${acc.threadsWorking}/${acc.threadsTotal}`,
                 'Working Time': workingTime,
