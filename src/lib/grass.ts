@@ -538,13 +538,18 @@ export default class Grass {
         await randomDelay();
 
         if (this.ws) {
-            this.ws.on('error', () => {/* no-op */});
+            this.ws.removeAllListeners();
 
-            this.ws.removeAllListeners('message');
-            this.ws.removeAllListeners('open');
-            this.ws.removeAllListeners('close');
+            this.ws.on('error', () => {});
 
-            this.ws.close();
+            // 3) now close or terminate
+            if (this.ws.readyState === WebSocket.OPEN) {
+                this.ws.close();
+            } else {
+                this.ws.terminate();
+            }
+
+            this.ws = undefined;
         }
 
 
