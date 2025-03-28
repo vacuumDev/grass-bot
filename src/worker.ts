@@ -1,10 +1,7 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
 import fs from "fs";
-
-const delay = async (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-};
+import {delay} from "./lib/helper.js";
 
 
 const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
@@ -20,7 +17,7 @@ const processGrassAccount = async (login: string, password: string, stickyProxy:
         const ms = Math.floor(Math.random() * (max - min + 1)) + min;
         const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount);
         promises.push(grass.startMining(login, password, stickyProxy, rotatingProxy));
-        await delay(ms)
+        await delay(ms);
     }
     // Prevent the worker from exiting immediately (if needed)
     await Promise.all(promises);

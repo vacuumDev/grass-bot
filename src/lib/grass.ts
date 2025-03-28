@@ -11,10 +11,41 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
+import {delay} from "./helper.js";
 
 // Чтение конфига и получение диапазона задержки.
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
-const delayRange: [number, number] = config.delay;
+const delayRange: [number, number] = config.delay ?? [100, 500];
+
+axios.interceptors.request.use(
+    (config) => {
+        if (
+            config.url &&
+            (config.url.includes("app.getgrass.io") ||
+                config.url.includes("api.getgrass.io") ||
+            config.url.includes('director.getgrass.io'))
+        ) {
+            config.headers = {
+                ...config.headers,
+                "sec-ch-ua":
+                    '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-site",
+                priority: "u=1, i",
+                origin: "https://app.getgrass.io",
+                referer: "https://app.getgrass.io/",
+                accept: "application/json, text/plain, */*",
+                "accept-encoding": "gzip, deflate, br, zstd",
+                "accept-language": "en-US;q=0.8,en;q=0.7",
+            };
+        }
+        return config;
+    },
+    (error) => Promise.reject(error),
+);
 
 function generateRandom12Hex() {
     let hex = '';
@@ -29,10 +60,6 @@ function randomDelay(): Promise<void> {
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-const delay = async (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-};
 
 export default class Grass {
     private accessToken!: string;

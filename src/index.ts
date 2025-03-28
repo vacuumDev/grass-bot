@@ -5,6 +5,7 @@ import RedisWorker from "./lib/redis-worker.js";
 import io from '@pm2/io';
 import readline from 'readline';
 import {logger} from "./lib/logger.js";
+import {shuffle} from "./lib/helper.js";
 
 
 io.init({
@@ -16,23 +17,11 @@ io.init({
 const workerStatuses = new Map<string, any>();
 const accountStartTimes = new Map<string, number>();
 const accountPoints = new Map<string, number>();
-const snapshotPoints = new Map<string, number>();
 const accountRegions = new Map<string, string>();
+const accountPointsHistory = new Map<string, { timestamp: number; points: number }[]>();
 
-let lastSnapshotTime = 0;
 const MS_IN_24H = 24 * 60 * 60 * 1000;
 
-let hasSnapshotTaken = false;
-
-
-function takeSnapshot() {
-    const now = Date.now();
-    accountPoints.forEach((points, email) => {
-        snapshotPoints.set(email, points);
-    });
-    lastSnapshotTime = now;
-    logger.debug(`Snapshot taken at ${new Date(now).toISOString()}`);
-}
 
 
 function formatDuration(ms: number): string {
@@ -80,6 +69,17 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
                 accountRegions.set(msg.email, msg.region)
             } else if(msg.type === 'updatePoints') {
                 accountPoints.set(msg.email, msg.pingCount);
+
+                // Обновляем историю очков
+                const now = Date.now();
+                const history = accountPointsHistory.get(msg.email) ?? [];
+                history.push({ timestamp: msg.timestamp, points: msg.pingCount });
+
+                // Оставляем только записи за последние 24 часа
+                accountPointsHistory.set(
+                    msg.email,
+                    history.filter(entry => entry.timestamp >= now - MS_IN_24H)
+                );
             }
         });
 
@@ -105,6 +105,10 @@ const main = async () => {
 
     logger.debug('Loaded config:' + JSON.stringify(accounts));
 
+    if(config.shuffle) {
+        shuffle(accounts)
+    };
+    console.log(accounts)
     // For each account, spawn enough workers so each worker gets a set number of threads.
     const workerPromises = [];
     for (const account of accounts) {
@@ -171,20 +175,20 @@ function scheduleStatsUpdate() {
         let totalThreads = 0;
         let totalChange24h = 0;
 
-        if(grouped.size === accounts.length && !hasSnapshotTaken) {
-            takeSnapshot();
-            hasSnapshotTaken = true;
-        }
-
         for (const [, acc] of grouped) {
             const workingTime = formatDuration(now - acc.startTime);
             const accountState = acc.states.includes('mining')
                 ? 'mining'
                 : acc.states[acc.states.length - 1];
 
-            const current = accountPoints.get(acc.email) || 0;
-            const snapshot = snapshotPoints.get(acc.email) || 0;
-            const change24h = current - snapshot;
+            // Текущие очки
+            const current = accountPoints.get(acc.email) ?? 0;
+
+            // Ищем точку за 24h назад (или самую раннюю, если нет)
+            const history = accountPointsHistory.get(acc.email) ?? [];
+            const cutoff = now - MS_IN_24H;
+            const oldEntry = history.find(e => e.timestamp <= cutoff) ?? history[0];
+            const change24h = oldEntry ? current - oldEntry.points : 0;
 
             rows.push({
                 'Start Time': new Date(acc.startTime).toISOString(),
@@ -212,6 +216,5 @@ function scheduleStatsUpdate() {
     }, 5_000);
 }
 
-setInterval(takeSnapshot, MS_IN_24H);
 scheduleStatsUpdate();
 
