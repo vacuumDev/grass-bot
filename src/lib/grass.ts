@@ -18,7 +18,7 @@ const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
 const delayRange: [number, number] = config.delay ?? [100, 500];
 
 axios.interceptors.request.use(
-    (config) => {
+    (config: any) => {
         if (
             config.url &&
             (config.url.includes("app.getgrass.io") ||
@@ -44,7 +44,7 @@ axios.interceptors.request.use(
         }
         return config;
     },
-    (error) => Promise.reject(error),
+    (error: any) => Promise.reject(error),
 );
 
 function generateRandom12Hex() {

@@ -17,7 +17,7 @@ const main = async () => {
         const lines = fileContent.split('\n').filter(line => line.trim() !== '');
         for (const line of lines) {
             if(line.includes('|')) {
-                const parts = line.split('|');
+                const parts: string[] = line.split('|');
                 if (parts.length >= 6) {
                     const email = parts[0];
 
@@ -33,12 +33,12 @@ const main = async () => {
                     const userAgent = parts[8];
 
 
-                    let rotatingProxy = '';
+                    let rotatingProxy: string = '';
 
                     if(parts.length === 12)
-                        rotatingProxy = parts[11];
+                        rotatingProxy = parts[11] as string;
 
-                    const account = {
+                    const account: any = {
                         login: email,
                         proxyThreads: getRandomNumber(minThreads, maxThreads),
                         userAgent,

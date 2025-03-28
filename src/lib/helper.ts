@@ -10,7 +10,7 @@ export const delay = async (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-export function shuffle(array) {
+export function shuffle(array: any[]) {
     let currentIndex = array.length;
 
     while (currentIndex != 0) {
