@@ -17,36 +17,6 @@ import {delay} from "./helper.js";
 const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
 const delayRange: [number, number] = config.delay ?? [100, 500];
 
-axios.interceptors.request.use(
-    (config: any) => {
-        if (
-            config.url &&
-            (config.url.includes("app.getgrass.io") ||
-                config.url.includes("api.getgrass.io") ||
-            config.url.includes('director.getgrass.io'))
-        ) {
-            config.headers = {
-                ...config.headers,
-                "sec-ch-ua":
-                    '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-site",
-                priority: "u=1, i",
-                origin: "https://app.getgrass.io",
-                referer: "https://app.getgrass.io/",
-                accept: "application/json, text/plain, */*",
-                "accept-encoding": "gzip, deflate, br, zstd",
-                "accept-language": "en-US;q=0.8,en;q=0.7",
-            };
-        }
-        return config;
-    },
-    (error: any) => Promise.reject(error),
-);
-
 function generateRandom12Hex() {
     let hex = '';
     for (let i = 0; i < 12; i++) {
@@ -456,16 +426,17 @@ export default class Grass {
         }
     }
 
-
     private scheduleTotalPointsUpdate(): void {
-        const minMs = 10 * 60_000;
-        const maxMs = 40 * 60_000;
-        const nextDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+        const intervalMs = 10 * 60_000;
 
-        this.totalPointsTimer = setTimeout(async () => {
+        this.totalPointsTimer = setInterval(async () => {
+            const minMs = 0;
+            const maxMs = 30 * 60_000;
+            const nextDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+
+            await delay(nextDelay)
             await this.updateTotalPoints();
-            this.scheduleTotalPointsUpdate();
-        }, nextDelay);
+        }, intervalMs);
     }
 
 
@@ -492,18 +463,44 @@ export default class Grass {
                 await this.triggerReconnect(false);
             }
         }, 120_000);
-        // setTimeout(async () => {
-        //     await randomDelay();
-        //     const scoreOk = await this.checkMiningScore();
-        //     if (!scoreOk) {
-        //         this.stopPeriodicTasks();
-        //         if (this.ws) {
-        //             this.ws.close();
-        //             this.ws.removeAllListeners();
-        //         }
-        //     }
-        // }, 180_000 * 20);
+        if(this.isLowAmount) {
+            setTimeout(async () => {
+                await randomDelay();
+                const scoreOk = await this.checkMiningScore();
+                if (!scoreOk) {
+                    this.stopPeriodicTasks();
+                    if (this.ws) {
+                        this.ws.close();
+                        this.ws.removeAllListeners();
+                    }
+                }
+            }, 180_000 * 20);
+        }
     }
+
+    async checkMiningScore(): Promise<boolean> {
+        try {
+            await randomDelay();
+            const res = await this.grassApi.get(`/retrieveDevice?input=%7B%22deviceId%22:%22${this.browserId}%22%7D`, { timeout: 20000 });
+            const device = res.data.result.data;
+            logger.debug('Devices: ' + JSON.stringify(device));
+            let currentScore = 0;
+            if (device) {
+                currentScore = device.ipScore;
+            }
+            logger.debug(`Network Score for device ${this.browserId}: ${currentScore}%`);
+
+            if (currentScore === 0 || currentScore < this.minScoreThreshold) {
+                logger.warn(`Score (${currentScore}%) is below threshold (${this.minScoreThreshold}%).`);
+                return false;
+            }
+            return true;
+        } catch (error: any) {
+            logger.debug("Error checking mining score:" + error);
+            return true;
+        }
+    }
+
     // Смена прокси.
     async changeProxy(): Promise<void> {
         logger.debug("Changing proxy...");
@@ -563,6 +560,7 @@ export default class Grass {
             this.ws.on('error', () => {/* no-op */});
 
             this.ws.close();
+            this.ws.terminate();
 
             this.ws = undefined;
         }

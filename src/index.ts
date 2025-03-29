@@ -22,8 +22,6 @@ const accountPointsHistory = new Map<string, { timestamp: number; points: number
 
 const MS_IN_24H = 24 * 60 * 60 * 1000;
 
-
-
 function formatDuration(ms: number): string {
     const totalMinutes = Math.floor(ms / 60000);
     const days = Math.floor(totalMinutes / 1440);
