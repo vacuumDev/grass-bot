@@ -214,4 +214,4 @@ const stats = () => {
     return;
 }
 stats();
-setInterval(stats, 120_000);
+setInterval(stats, 5_000);
