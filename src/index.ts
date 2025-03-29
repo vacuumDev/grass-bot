@@ -125,94 +125,93 @@ const main = async () => {
 
 main();
 
-// Optionally, display the current statuses on the console every minute:
-function scheduleStatsUpdate() {
-    setTimeout(() => {
-        const now = Date.now();
-        const grouped = new Map<string, {
-            startTime: number;
-            id: string;
-            email: string;
-            totalPoints: number;
-            threadsWorking: number;
-            threadsTotal: number;
-            states: string[];
-        }>();
+const stats = () => {
+    const now = Date.now();
+    const grouped = new Map<string, {
+        startTime: number;
+        id: string;
+        email: string;
+        totalPoints: number;
+        threadsWorking: number;
+        threadsTotal: number;
+        states: string[];
+    }>();
 
 
-        workerStatuses.forEach((status, workerId) => {
-            if (now - status.lastUpdate > 240_000) {
-                status.state = 'inactive';
-                logger.debug(`Worker ${workerId} marked as inactive due to inactivity.`);
-            }
+    workerStatuses.forEach((status, workerId) => {
+        if (now - status.lastUpdate > 240_000) {
+            status.state = 'inactive';
+            logger.debug(`Worker ${workerId} marked as inactive due to inactivity.`);
+        }
+    });
+
+    for (const [, status] of workerStatuses) {
+        const { email, state, pingCount, threadId } = status;
+        const accCfg = accounts.find((acc: any) => acc.login === email) || {};
+        if (!grouped.has(email)) {
+            grouped.set(email, {
+                startTime: accountStartTimes.get(email) ?? now,
+                id: threadId,
+                email: email,
+                totalPoints: pingCount,
+                threadsWorking: state === 'mining' ? 1 : 0,
+                threadsTotal: accCfg.proxyThreads ?? 0,
+                states: [state],
+            });
+        } else {
+            const acc = grouped.get(email)!;
+            acc.totalPoints = pingCount;
+            acc.threadsWorking += (state === 'mining' ? 1 : 0);
+            acc.states.push(state);
+        }
+    }
+
+    let rows: any[] | undefined = [];
+    let totalPoints = 0;
+    let totalThreads = 0;
+    let totalChange24h = 0;
+
+    for (const [, acc] of grouped) {
+        const workingTime = formatDuration(now - acc.startTime);
+        const accountState = acc.states.includes('mining')
+            ? 'mining'
+            : acc.states[acc.states.length - 1];
+
+        // Текущие очки
+        const current = accountPoints.get(acc.email) ?? 0;
+
+        // Ищем точку за 24h назад (или самую раннюю, если нет)
+        const history = accountPointsHistory.get(acc.email) ?? [];
+        const cutoff = now - MS_IN_24H;
+        const oldEntry = history.find(e => e.timestamp <= cutoff) ?? history[0];
+        const change24h = oldEntry ? current - oldEntry.points : 0;
+
+        rows.push({
+            'Start Time': new Date(acc.startTime).toISOString(),
+            'Email': acc.email,
+            'State': accountState,
+            'Points': accountPoints.get(acc.email) || 0,
+            '24h Change': change24h,
+            'Targeting country': accountRegions.get(acc.email) || "N/A",
+            'Threads Working': `${acc.threadsWorking}/${acc.threadsTotal}`,
+            'Working Time': workingTime,
         });
 
-        for (const [, status] of workerStatuses) {
-            const { email, state, pingCount, threadId } = status;
-            const accCfg = accounts.find((acc: any) => acc.login === email) || {};
-            if (!grouped.has(email)) {
-                grouped.set(email, {
-                    startTime: accountStartTimes.get(email) ?? now,
-                    id: threadId,
-                    email: email,
-                    totalPoints: pingCount,
-                    threadsWorking: state === 'mining' ? 1 : 0,
-                    threadsTotal: accCfg.proxyThreads ?? 0,
-                    states: [state],
-                });
-            } else {
-                const acc = grouped.get(email)!;
-                acc.totalPoints = pingCount;
-                acc.threadsWorking += (state === 'mining' ? 1 : 0);
-                acc.states.push(state);
-            }
-        }
-
-        const rows: any[] = [];
-        let totalPoints = 0;
-        let totalThreads = 0;
-        let totalChange24h = 0;
-
-        for (const [, acc] of grouped) {
-            const workingTime = formatDuration(now - acc.startTime);
-            const accountState = acc.states.includes('mining')
-                ? 'mining'
-                : acc.states[acc.states.length - 1];
-
-            // Текущие очки
-            const current = accountPoints.get(acc.email) ?? 0;
-
-            // Ищем точку за 24h назад (или самую раннюю, если нет)
-            const history = accountPointsHistory.get(acc.email) ?? [];
-            const cutoff = now - MS_IN_24H;
-            const oldEntry = history.find(e => e.timestamp <= cutoff) ?? history[0];
-            const change24h = oldEntry ? current - oldEntry.points : 0;
-
-            rows.push({
-                'Start Time': new Date(acc.startTime).toISOString(),
-                'Email': acc.email,
-                'State': accountState,
-                'Points': accountPoints.get(acc.email) || 0,
-                '24h Change': change24h,
-                'Targeting country': accountRegions.get(acc.email) || "N/A",
-                'Threads Working': `${acc.threadsWorking}/${acc.threadsTotal}`,
-                'Working Time': workingTime,
-            });
-
-            totalPoints += accountPoints.get(acc.email) || 0;
-            totalThreads += acc.threadsWorking;
-            totalChange24h += change24h;
-        }
-        if(!config.debug) {
-            readline.cursorTo(process.stdout, 0, 0);
-            readline.clearScreenDown(process.stdout);
-        }
-        console.table(rows);
-        console.log(`Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`);
-
-        scheduleStatsUpdate();
-    }, 5_000);
+        totalPoints += accountPoints.get(acc.email) || 0;
+        totalThreads += acc.threadsWorking;
+        totalChange24h += change24h;
+    }
+    if(!config.debug) {
+        readline.cursorTo(process.stdout, 0, 0);
+        readline.clearScreenDown(process.stdout);
+    }
+    console.table(rows);
+    let info: string | undefined = `Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`;
+    console.log(info);
+    info = undefined;
+    rows = undefined;
+    grouped.clear();
+    return;
 }
-
-scheduleStatsUpdate();
-
+stats();
+setInterval(stats, 120_000);
