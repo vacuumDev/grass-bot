@@ -63,7 +63,9 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
                     pingCount: msg.pingCount,
                     region: msg.region
                 };
+                workerStatuses.delete(msg.email);
                 workerStatuses.set(msg.workerId, status);
+                accountRegions.delete(msg.email)
                 accountRegions.set(msg.email, msg.region)
             } else if(msg.type === 'updatePoints') {
                 accountPoints.set(msg.email, msg.pingCount);
@@ -74,6 +76,8 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
                 history.push({ timestamp: msg.timestamp, points: msg.pingCount });
 
                 // Оставляем только записи за последние 24 часа
+
+                accountPointsHistory.delete(msg.email);
                 accountPointsHistory.set(
                     msg.email,
                     history.filter(entry => entry.timestamp >= now - MS_IN_24H)
