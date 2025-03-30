@@ -432,14 +432,16 @@ export default class Grass {
     }
 
     private scheduleTotalPointsUpdate(): void {
-        const intervalMs = 10 * 60_000;
+        if (this.totalPointsTimer) {
+            clearInterval(this.totalPointsTimer);
+        }
 
+        const intervalMs = 10 * 60_000;
         this.totalPointsTimer = setInterval(async () => {
             const minMs = 0;
             const maxMs = 30 * 60_000;
             const nextDelay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-
-            await delay(nextDelay)
+            await delay(nextDelay);
             await this.updateTotalPoints();
         }, intervalMs);
     }
@@ -554,7 +556,7 @@ export default class Grass {
      * Если происходит ошибка при checkIn или connectWebSocket, то ошибка пробрасывается наружу
      * и может быть обработана внешним блоком catch для повторного вызова triggerReconnect.
      */
-    async triggerReconnect(needProxyChange: boolean = false): Promise<void> {
+    async triggerReconnect(needProxyChange = false): Promise<void> {
         this.setThreadState("reconnecting");
         this.stopPeriodicTasks();
         this.browserId = uuidv4();
@@ -562,34 +564,36 @@ export default class Grass {
 
         if (this.ws) {
             this.ws.removeAllListeners();
-            this.ws.on('error', () => {/* no-op */});
-
+            this.ws.on('error', () => {});
             this.ws.close();
             this.ws.terminate();
-
             this.ws = undefined;
         }
-
 
         if (needProxyChange) {
             await this.changeProxy();
         }
-        try {
-            const { destinations, token } = await this.checkIn();
-            await this.connectWebSocket(destinations[0] as string, token);
-            logger.debug("Reconnected successfully.");
-            this.setThreadState("mining");
-        } catch (error: any) {
-            logger.debug("Reconnection failed:" + error);
-            this.retryCount++;
-            if(this.retryCount >= 10) {
-                await delay(30_000);
-                this.retryCount = 0;
+
+        let reconnected = false;
+        while (!reconnected) {
+            try {
+                const { destinations, token } = await this.checkIn();
+                await this.connectWebSocket(destinations[0], token);
+                logger.debug("Reconnected successfully.");
+                this.setThreadState("mining");
+                reconnected = true;
+            } catch (error) {
+                logger.debug("Reconnection failed:" + error);
+                this.retryCount++;
+                if (this.retryCount >= 10) {
+                    await delay(30_000);
+                    this.retryCount = 0;
+                }
+                this.setThreadState("reconnect retry");
+                await randomDelay();
+                await delay(1_000);
+                // The loop will try again without further recursive calls.
             }
-            this.setThreadState("reconnect retry");
-            await randomDelay();
-            await delay(1_000);
-            await this.triggerReconnect(false);
         }
     }
 
