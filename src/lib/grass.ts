@@ -252,14 +252,17 @@ export default class Grass {
      */
     async connectWebSocket(destination: string, token: string): Promise<void> {
         this.setThreadState("connecting websocket");
-
         const wsUrl = `ws://${destination}/?token=${token}`;
 
         return new Promise<void>((resolve, reject) => {
             try {
-                this.ws = new WebSocket(wsUrl, { agent: new HttpsProxyAgent(this.rotatingProxy), handshakeTimeout: 7500 });
+                this.ws = new WebSocket(wsUrl, {
+                    agent: new HttpsProxyAgent(this.rotatingProxy),
+                    handshakeTimeout: 7500,
+                });
 
-                this.ws.on("open", async () => {
+                // При успешном открытии – резолвим Promise.
+                this.ws.once("open", async () => {
                     this.setThreadState("mining");
                     try {
                         this.sendPing();
@@ -268,13 +271,30 @@ export default class Grass {
                         this.setThreadState("error ping sending");
                         await delay(1_000);
                         this.stopPeriodicTasks();
-                        reject(err);
-                        return;
+                        return reject(err);
                     }
                     this.startPeriodicTasks();
                     logger.debug("WebSocket connection opened.");
+                    resolve();
                 });
 
+                // Если возникает ошибка или сокет закрывается – пытаемся переподключиться.
+                const reconnectHandler = async (...args: any[]) => {
+                    logger.debug("WebSocket encountered an error or closed. Reconnecting...");
+                    this.stopPeriodicTasks();
+                    await this.triggerReconnect(false);
+                };
+
+                this.ws.on("error", () => {
+                    logger.debug('Error occured');
+                });
+                this.ws.on("close", reconnectHandler);
+                this.ws.on("unexpected-response", async (req, res) => {
+                    logger.debug(`WebSocket unexpected-response. Status code: ${res.statusCode}`);
+                    await this.triggerReconnect(false);
+                });
+
+                // Обработка входящих сообщений (оставляем существующую логику)
                 this.ws.on("message", async (data: WebSocket.Data) => {
                     const messageStr = data.toString();
                     try {
@@ -290,7 +310,7 @@ export default class Grass {
                                 };
                                 await this.sendMessage(responseMessage);
                             } catch (err: any) {
-                                // Пытаемся выполнить запрос ещё раз перед выбросом ошибки.
+                                // Попытка повторного запроса перед выбросом ошибки.
                                 try {
                                     const result = await this.performHttpRequest(requestUrl);
                                     const responseMessage = {
@@ -301,7 +321,7 @@ export default class Grass {
                                     await this.sendMessage(responseMessage);
                                 } catch (err: any) {
                                     logger.debug("Error during HTTP_REQUEST:" + err);
-                                    reject(err);
+                                    await this.triggerReconnect(false);
                                 }
                             }
                         } else if (message.action === "PING") {
@@ -316,36 +336,21 @@ export default class Grass {
                                 origin_action: "PONG",
                             };
                             await this.sendMessage(pongResponse);
-                            // logger.debug(`Sent pong message with id ${message.id}`);
                         } else if (message.action === "MINING_REWARD") {
                             // Обработка сообщения о награде за майнинг.
                             const points = message.data?.points || 0;
                         }
                     } catch (err: any) {
                         logger.debug("Error parsing message:" + err);
-                        reject(err);
+                        await this.triggerReconnect(false);
                     }
-                });
-
-                this.ws.on("error", (error: Error) => {
-                    logger.debug("WebSocket error:" + error);
-                });
-
-                this.ws.on("unexpected-response", (req, res) => {
-                    logger.debug(`WebSocket unexpected-response. Status code: ${res.statusCode}`);
-                    reject(new Error(`WebSocket handshake unexpected-response: ${res.statusCode}`));
-                });
-
-                this.ws.on("close", (code: number, reason: Buffer) => {
-                    logger.debug(`Connection closed: Code ${code}, Reason: ${reason.toString()}`);
-                    this.stopPeriodicTasks();
-                    reject(new Error(`WebSocket closed: Code ${code}, Reason: ${reason.toString()}`));
                 });
             } catch (err: any) {
                 reject(err);
             }
         });
     }
+
 
     // Отправка PING-сообщения.
     sendPing(): void {
