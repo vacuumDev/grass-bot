@@ -463,6 +463,7 @@
     220
   ],
   "shuffle": true,
+  "redisUrl": "redis://:fhg384f3h387f383f30h43h84@localhost:6379",
   "rotatingProxy": "http://randomcountry-country-any-filter-medium:6c4dbb8d35194@gate.nodemaven.com:8080",
   "stickyProxy": "http://maddnivan_gmail_com-country-any-sid-{ID}4-filter-medium:hy9o97m71v@gate.nodemaven.com:8080",
   "debug": true

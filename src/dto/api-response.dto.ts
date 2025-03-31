@@ -1,5 +1,5 @@
 export default class ApiResponseDto<T> {
-    result!: {
-        data: T
-    }
+  result!: {
+    data: T;
+  };
 }

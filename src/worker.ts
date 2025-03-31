@@ -1,68 +1,102 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import fs from "fs";
-import {delay} from "./lib/helper.js";
+import { delay } from "./lib/helper.js";
 import axios from "axios";
-
-
-const config = JSON.parse(fs.readFileSync('data/config.json', 'utf-8'));
-
+import config from "./lib/config.js";
 
 axios.interceptors.request.use(
-    (config: any) => {
-        if (
-            config.url &&
-            (config.url.includes("app.getgrass.io") ||
-                config.url.includes("api.getgrass.io") ||
-                config.url.includes('director.getgrass.io'))
-        ) {
-            config.headers = {
-                ...config.headers,
-                "sec-ch-ua":
-                    '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-site",
-                priority: "u=1, i",
-                origin: "https://app.getgrass.io",
-                referer: "https://app.getgrass.io/",
-                accept: "application/json, text/plain, */*",
-                "accept-encoding": "gzip, deflate, br, zstd",
-                "accept-language": "en-US;q=0.8,en;q=0.7",
-            };
-        }
-        return config;
-    },
-    (error: any) => Promise.reject(error),
+  (config: any) => {
+    if (
+      config.url &&
+      (config.url.includes("app.getgrass.io") ||
+        config.url.includes("api.getgrass.io") ||
+        config.url.includes("director.getgrass.io"))
+    ) {
+      config.headers = {
+        ...config.headers,
+        "sec-ch-ua":
+          '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        priority: "u=1, i",
+        origin: "https://app.getgrass.io",
+        referer: "https://app.getgrass.io/",
+        accept: "application/json, text/plain, */*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "en-US;q=0.8,en;q=0.7",
+      };
+    }
+    return config;
+  },
+  (error: any) => Promise.reject(error),
 );
 
-const processGrassAccount = async (login: string, password: string, stickyProxy: string, rotatingProxy: string, proxyThreads: number, isPrimary: boolean, userAgent: string) => {
-    await RedisWorker.init();
-    const promises = [];
+const processGrassAccount = async (
+  login: string,
+  password: string,
+  stickyProxy: string,
+  rotatingProxy: string,
+  proxyThreads: number,
+  isPrimary: boolean,
+  userAgent: string,
+) => {
+  await RedisWorker.init();
+  const promises = [];
 
-    const min = config.delay[0], max = config.delay[1];
+  const min = config.delay[0],
+    max = config.delay[1];
 
-    for (let i = 0; i < proxyThreads; i++) {
-        const isLowAmount = isPrimary && proxyThreads < 30;
-        const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-        const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount);
-        promises.push(grass.startMining(login, password, stickyProxy, rotatingProxy));
-        await delay(ms);
-    }
-    // Prevent the worker from exiting immediately (if needed)
-    await Promise.all(promises);
-    await new Promise(() => {});
+  for (let i = 0; i < proxyThreads; i++) {
+    const isLowAmount = isPrimary && proxyThreads < 30;
+    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+    const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount);
+    promises.push(
+      grass.startMining(login, password, stickyProxy, rotatingProxy),
+    );
+    await delay(ms);
+  }
+  // Prevent the worker from exiting immediately (if needed)
+  await Promise.all(promises);
+  await new Promise(() => {});
 };
 
-process.on('message', async (msg: { login: string; password: string; stickyProxy: string; rotatingProxy: string; isPrimary: boolean; proxyThreads: number; userAgent: string }) => {
-    const { login, password, stickyProxy, rotatingProxy, proxyThreads, isPrimary, userAgent } = msg;
+process.on(
+  "message",
+  async (msg: {
+    login: string;
+    password: string;
+    stickyProxy: string;
+    rotatingProxy: string;
+    isPrimary: boolean;
+    proxyThreads: number;
+    userAgent: string;
+  }) => {
+    const {
+      login,
+      password,
+      stickyProxy,
+      rotatingProxy,
+      proxyThreads,
+      isPrimary,
+      userAgent,
+    } = msg;
     try {
-        await processGrassAccount(login, password, stickyProxy, rotatingProxy, proxyThreads, isPrimary, userAgent);
+      await processGrassAccount(
+        login,
+        password,
+        stickyProxy,
+        rotatingProxy,
+        proxyThreads,
+        isPrimary,
+        userAgent,
+      );
     } catch (error: any) {
-        // Send error message back if needed
-        //@ts-ignore
-        process.send({ success: false, error: error.message });
+      // Send error message back if needed
+      //@ts-ignore
+      process.send({ success: false, error: error.message });
     }
-});
+  },
+);

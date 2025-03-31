@@ -1,31 +1,27 @@
-import fs from 'fs';
-import RedisWorker from "./redis-worker.js";
-import {HttpsProxyAgent} from "https-proxy-agent";
-
-const config = JSON.parse(fs.readFileSync("data/config.json", "utf8"));
+import { HttpsProxyAgent } from "https-proxy-agent";
+import config from "./config.js";
 
 function generateRandom12Hex() {
-    let hex = '';
-    for (let i = 0; i < 12; i++) {
-        hex += Math.floor(Math.random() * 16).toString(16);
-    }
-    return hex;
+  let hex = "";
+  for (let i = 0; i < 12; i++) {
+    hex += Math.floor(Math.random() * 16).toString(16);
+  }
+  return hex;
 }
 
 export default class ProxyManager {
-    static rotatingProxy = config.rotatingProxy;
-    static stickyProxy = config.stickyProxy;
-    static getProxy(useRotatingProxy = false) {
-        if(useRotatingProxy)
-            return ProxyManager.rotatingProxy;
+  static rotatingProxy = config.rotatingProxy;
+  static stickyProxy = config.stickyProxy;
+  static getProxy(useRotatingProxy = false) {
+    if (useRotatingProxy) return ProxyManager.rotatingProxy;
 
-        let proxy = ProxyManager.stickyProxy.replace('{ID}', generateRandom12Hex());
-        try {
-            const agent = new HttpsProxyAgent(proxy);
-        } catch (e) {
-            proxy = ProxyManager.stickyProxy.replace('{ID}', generateRandom12Hex());
-        }
-
-        return proxy;
+    let proxy = ProxyManager.stickyProxy.replace("{ID}", generateRandom12Hex());
+    try {
+      const agent = new HttpsProxyAgent(proxy);
+    } catch (e) {
+      proxy = ProxyManager.stickyProxy.replace("{ID}", generateRandom12Hex());
     }
+
+    return proxy;
+  }
 }
