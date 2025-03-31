@@ -63,7 +63,7 @@ const runWorker = (login: string, password: string, stickyProxy: string, rotatin
                     pingCount: msg.pingCount,
                     region: msg.region
                 };
-                workerStatuses.delete(msg.email);
+                workerStatuses.delete(msg.workerId);
                 workerStatuses.set(msg.workerId, status);
                 accountRegions.delete(msg.email)
                 accountRegions.set(msg.email, msg.region)
