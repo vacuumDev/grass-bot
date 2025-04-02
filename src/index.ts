@@ -239,6 +239,9 @@ const stats = () => {
     totalThreads += acc.threadsWorking;
     totalChange24h += change24h;
   }
+
+  rows.sort((a, b) => new Date(a["Start Time"]).getTime() - new Date(b["Start Time"]).getTime());
+
   if (!config.debug) {
     readline.cursorTo(process.stdout, 0, 0);
     readline.clearScreenDown(process.stdout);
