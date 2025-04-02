@@ -1,36 +1,11 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import { delay } from "./lib/helper.js";
+import {delay, headersInterceptor} from "./lib/helper.js";
 import axios from "axios";
 import config from "./lib/config.js";
 
 axios.interceptors.request.use(
-  (config: any) => {
-    if (
-      config.url &&
-      (config.url.includes("app.getgrass.io") ||
-        config.url.includes("api.getgrass.io") ||
-        config.url.includes("director.getgrass.io"))
-    ) {
-      config.headers = {
-        ...config.headers,
-        "sec-ch-ua":
-          '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        priority: "u=1, i",
-        origin: "https://app.getgrass.io",
-        referer: "https://app.getgrass.io/",
-        accept: "application/json, text/plain, */*",
-        "accept-encoding": "gzip, deflate, br, zstd",
-        "accept-language": "en-US;q=0.8,en;q=0.7",
-      };
-    }
-    return config;
-  },
+  headersInterceptor,
   (error: any) => Promise.reject(error),
 );
 

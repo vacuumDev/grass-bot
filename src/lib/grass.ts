@@ -11,7 +11,7 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
-import { delay } from "./helper.js";
+import {delay, headersInterceptor} from "./helper.js";
 import config from "./config.js";
 
 // Чтение конфига и получение диапазона задержки.
@@ -107,6 +107,26 @@ export default class Grass {
     }
   }
 
+  configureInstance() {
+    const config: AxiosRequestConfig = {
+      baseURL: "https://api.getgrass.io",
+      headers: {
+        Authorization: this.accessToken,
+        "User-Agent": this.userAgent,
+      },
+      httpsAgent: this.proxy,
+      httpAgent: this.proxy,
+      timeout: 12_000,
+    };
+
+    this.grassApi = axios.create(config);
+
+    this.grassApi.interceptors.request.use(
+        headersInterceptor,
+        (error: any) => Promise.reject(error),
+    );
+  }
+
   // Логин и настройка экземпляра axios.
   async login(
     email: string,
@@ -125,35 +145,10 @@ export default class Grass {
         const parsedSession = JSON.parse(session);
         this.accessToken = parsedSession.accessToken;
         this.userId = parsedSession.userId;
-        const config: AxiosRequestConfig = {
-          baseURL: "https://api.getgrass.io",
-          headers: {
-            Authorization: this.accessToken,
-            "User-Agent": this.userAgent,
-          },
-          httpsAgent: this.proxy,
-          httpAgent: this.proxy,
-          timeout: 7500,
-        };
-
-        this.grassApi = axios.create(config);
-        this.setThreadState("logged in (session reused)");
-        return;
       }
 
-      if (this.accessToken) {
-        const config: AxiosRequestConfig = {
-          baseURL: "https://api.getgrass.io",
-          headers: {
-            Authorization: this.accessToken,
-            "User-Agent": this.userAgent,
-          },
-          httpsAgent: this.proxy,
-          httpAgent: this.proxy,
-          timeout: 7500,
-        };
-
-        this.grassApi = axios.create(config);
+      if (this.accessToken || session) {
+        this.configureInstance();
         this.setThreadState("logged in");
         return;
       }
@@ -170,24 +165,13 @@ export default class Grass {
           {
             httpsAgent: this.proxy,
             httpAgent: this.proxy,
-            timeout: 7500,
+            timeout: 12_000,
           },
         );
       this.accessToken = res.data.result.data.accessToken;
       this.refreshToken = res.data.result.data.refreshToken;
 
-      const configAxios: AxiosRequestConfig = {
-        baseURL: "https://api.getgrass.io",
-        headers: {
-          Authorization: this.accessToken,
-          "User-Agent": this.userAgent,
-        },
-        httpsAgent: this.proxy,
-        httpAgent: this.proxy,
-        timeout: 7500,
-      };
-
-      this.grassApi = axios.create(configAxios);
+      this.configureInstance();
 
       // Получаем данные пользователя, чтобы установить userId.
       const user: UserResponseData = await this.getUser();
@@ -250,7 +234,10 @@ export default class Grass {
         {
           httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
           httpAgent: new HttpsProxyAgent(this.rotatingProxy),
-          timeout: 7500,
+          headers: {
+            "User-Agent": new UserAgent({ deviceCategory: 'desktop' }).toString()
+          },
+          timeout: 12_000,
         },
       );
       const responseData = res.data;
@@ -285,7 +272,7 @@ export default class Grass {
       try {
         this.ws = new WebSocket(wsUrl, {
           agent: new HttpsProxyAgent(this.rotatingProxy),
-          handshakeTimeout: 7500,
+          handshakeTimeout: 12_000,
         });
 
         // При успешном открытии – резолвим Promise.
@@ -421,7 +408,7 @@ export default class Grass {
       const response = await axios.get(url, {
         httpAgent: new HttpsProxyAgent(this.rotatingProxy),
         httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
-        timeout: 7500,
+        timeout: 12_000,
       });
       const encodedBody = Buffer.from(JSON.stringify(response.data)).toString(
         "base64",
@@ -587,17 +574,7 @@ export default class Grass {
     }
 
     this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
-    const configAxios: AxiosRequestConfig = {
-      baseURL: "https://api.getgrass.io",
-      headers: {
-        Authorization: this.accessToken,
-        "User-Agent": this.userAgent,
-      },
-      httpsAgent: this.proxy,
-      httpAgent: this.proxy,
-      timeout: 7500,
-    };
-    this.grassApi = axios.create(configAxios);
+    this.configureInstance();
     logger.debug(`Proxy changed to: ${this.currentProxyUrl}`);
   }
 
