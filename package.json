@@ -24,6 +24,7 @@
     "@pm2/io": "^6.1.0",
     "axios": "^1.8.1",
     "dotenv": "^16.4.7",
+    "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "imap": "^0.8.19",
     "redis": "^4.7.0",

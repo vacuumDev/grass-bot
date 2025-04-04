@@ -8,7 +8,30 @@ export function getRandomNumber(min: number, max: number): number {
 export const delay = async (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
-export const headersInterceptor = (config: any) => {
+
+
+
+function getPlatformFromUserAgent(ua = "") {
+  const uaLower = ua.toLowerCase();
+
+  if (uaLower.includes("windows")) {
+    return "Windows";
+  } else if (uaLower.includes("mac os x") || uaLower.includes("macintosh")) {
+    return "macOS";
+  } else if (uaLower.includes("android")) {
+    return "Android";
+  } else if (uaLower.includes("iphone") || uaLower.includes("ipad") || uaLower.includes("ios")) {
+    return "iOS";
+  } else if (uaLower.includes("linux")) {
+    return "Linux";
+  }
+
+  // Если не распознали
+  return "Windows";
+}
+
+
+export const headersInterceptor = (config) => {
   if (
       config.baseURL &&
       (config.baseURL.includes("app.getgrass.io") ||
@@ -23,6 +46,10 @@ export const headersInterceptor = (config: any) => {
     if (match) {
       chromeVersion = match[1];
     }
+
+    const platform = getPlatformFromUserAgent(config.headers['User-Agent']);
+    const randomBrandVersion = Math.floor(Math.random() * 90) + 10; // от 10 до 99
+
     config.headers = {
       accept: "application/json, text/plain, */*",
       "accept-encoding": "gzip, deflate, br, zstd",
@@ -33,9 +60,9 @@ export const headersInterceptor = (config: any) => {
       referer: "https://app.getgrass.io/",
       ...(isChrome && {
         "sec-ch-ua":
-            `"Chromium";v="${chromeVersion}", "Not:A-Brand";v="24", "Google Chrome";v="${chromeVersion}"`,
+            `"Chromium";v="${chromeVersion}", "Not:A-Brand";v="${randomBrandVersion}", "Google Chrome";v="${chromeVersion}"`,
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
+        "sec-ch-ua-platform": `"${platform}"`,
       }),
       "sec-fetch-dest": "empty",
       "sec-fetch-mode": "cors",
@@ -46,6 +73,7 @@ export const headersInterceptor = (config: any) => {
   }
   return config;
 };
+
 export function shuffle(array: any[]) {
   let currentIndex = array.length;
 

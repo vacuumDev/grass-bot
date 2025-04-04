@@ -11,11 +11,17 @@ import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
-import {delay, headersInterceptor} from "./helper.js";
+import {delay, getRandomNumber, headersInterceptor} from "./helper.js";
 import config from "./config.js";
+import {HttpProxyAgent} from "http-proxy-agent";
 
 // Чтение конфига и получение диапазона задержки.
 const delayRange: [number, number] = config.delay ?? [100, 500];
+
+axios.interceptors.request.use(
+    headersInterceptor,
+    (error) => Promise.reject(error),
+);
 
 function generateRandom12Hex() {
   let hex = "";
@@ -34,7 +40,7 @@ function randomDelay(): Promise<void> {
 export default class Grass {
   private accessToken!: string;
   private refreshToken!: string;
-  private proxy!: HttpsProxyAgent<string>;
+  private httpsAgent!: HttpsProxyAgent<string>;
   private grassApi!: AxiosInstance;
   private ws?: WebSocket;
   private browserId: string;
@@ -59,13 +65,18 @@ export default class Grass {
   private retryCount = 0;
   private isLowAmount: boolean;
   private isGlobalProxy!: boolean;
+  private httpAgent: HttpProxyAgent<string>;
+  private miningUa: string;
+  private isReconnecting: boolean = false;
 
   constructor(
     i: number,
     isPrimary: boolean,
     userAgent: string,
     isLowAmount: boolean,
+    email
   ) {
+    this.email = email;
     this.isPrimary = isPrimary;
     this.browserId = uuidv4();
     this.index = i;
@@ -114,8 +125,8 @@ export default class Grass {
         Authorization: this.accessToken,
         "User-Agent": this.userAgent,
       },
-      httpsAgent: this.proxy,
-      httpAgent: this.proxy,
+      httpsAgent: this.httpsAgent,
+      httpAgent: this.httpAgent,
       timeout: 12_000,
     };
 
@@ -137,7 +148,8 @@ export default class Grass {
     this.currentProxyUrl = stickyProxy
       ? stickyProxy.replace("{ID}", generateRandom12Hex())
       : ProxyManager.getProxy();
-    this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
+    this.httpsAgent = new HttpsProxyAgent(this.currentProxyUrl as string);
+    this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
 
     try {
       const session = await RedisWorker.getSession(email);
@@ -163,8 +175,8 @@ export default class Grass {
             v: "5.0.0",
           },
           {
-            httpsAgent: this.proxy,
-            httpAgent: this.proxy,
+            httpsAgent: this.httpsAgent,
+            httpAgent: this.httpAgent,
             timeout: 12_000,
           },
         );
@@ -218,13 +230,14 @@ export default class Grass {
   // Check‑in: отправляет данные и получает destinations и token.
   async checkIn(): Promise<{ destinations: string[]; token: string }> {
     this.setThreadState("checking in");
+    this.miningUa = new UserAgent({ deviceCategory: "desktop" }).toString();
     try {
       const data = {
         browserId: this.browserId,
         userId: this.userId,
         version: "5.0.0",
         extensionId: "lkbnfiajjmbhnfledhphioinpickokdi",
-        userAgent: new UserAgent({ deviceCategory: "desktop" }).toString(),
+        userAgent: this.miningUa,
         deviceType: "extension",
       };
       await randomDelay();
@@ -233,9 +246,9 @@ export default class Grass {
         data,
         {
           httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
-          httpAgent: new HttpsProxyAgent(this.rotatingProxy),
+          httpAgent: new HttpProxyAgent(this.rotatingProxy),
           headers: {
-            "User-Agent": new UserAgent({ deviceCategory: 'desktop' }).toString()
+            "User-Agent": this.miningUa
           },
           timeout: 12_000,
         },
@@ -264,6 +277,18 @@ export default class Grass {
    * Открывает WebSocket-соединение, обёрнутое в Promise.
    * При ошибке (например, при отправке сообщения или закрытии сокета) вызывается reject.
    */
+
+
+
+  private handleHttpRequest = async (requestUrl, message) => {
+    const result = await this.performHttpRequest(requestUrl);
+    const responseMessage = {
+      id: message.id,
+      origin_action: message.action, // "HTTP_REQUEST"
+      result
+    };
+    await this.sendMessage(responseMessage);
+  };
   async connectWebSocket(destination: string, token: string): Promise<void> {
     this.setThreadState("connecting websocket");
     const wsUrl = `ws://${destination}/?token=${token}`;
@@ -272,6 +297,10 @@ export default class Grass {
       try {
         this.ws = new WebSocket(wsUrl, {
           agent: new HttpsProxyAgent(this.rotatingProxy),
+          headers: {
+            'User-Agent': this.miningUa,
+            origin: "chrome-extension://lkbnfiajjmbhnfledhphioinpickokdi"
+          },
           handshakeTimeout: 12_000,
         });
 
@@ -283,7 +312,7 @@ export default class Grass {
           } catch (err: any) {
             logger.debug("Ping send error:" + err.message);
             this.setThreadState("error ping sending");
-            await delay(1_000);
+            await randomDelay();
             this.stopPeriodicTasks();
             return reject(err);
           }
@@ -315,54 +344,36 @@ export default class Grass {
         // Обработка входящих сообщений (оставляем существующую логику)
         this.ws.on("message", async (data: WebSocket.Data) => {
           const messageStr = data.toString();
+
           try {
             const message = JSON.parse(messageStr);
+
             if (message.action === "HTTP_REQUEST") {
               const requestUrl = message.data.url;
+
               try {
-                const result = await this.performHttpRequest(requestUrl);
-                const responseMessage = {
-                  id: message.id,
-                  origin_action: message.action,
-                  result: result,
-                };
-                await this.sendMessage(responseMessage);
+                await this.handleHttpRequest(requestUrl, message);
               } catch (err: any) {
-                // Попытка повторного запроса перед выбросом ошибки.
                 try {
-                  const result = await this.performHttpRequest(requestUrl);
-                  const responseMessage = {
-                    id: message.id,
-                    origin_action: message.action,
-                    result: result,
-                  };
-                  await this.sendMessage(responseMessage);
+                  await this.handleHttpRequest(requestUrl, message);
                 } catch (err: any) {
-                  logger.debug("Error during HTTP_REQUEST:" + err);
+                  logger.debug("Error during HTTP_REQUEST: " + err);
                   await this.triggerReconnect(false);
                 }
               }
-            } else if (message.action === "PING") {
+            } else if (message.action === "PING" || message.action === "PONG") {
               const pongResponse = {
                 id: message.id,
                 origin_action: "PONG",
               };
               await this.sendMessage(pongResponse);
-            } else if (message.action === "PONG") {
-              const pongResponse = {
-                id: message.id,
-                origin_action: "PONG",
-              };
-              await this.sendMessage(pongResponse);
-            } else if (message.action === "MINING_REWARD") {
-              // Обработка сообщения о награде за майнинг.
-              const points = message.data?.points || 0;
             }
           } catch (err: any) {
-            logger.debug("Error parsing message:" + err);
+            logger.debug("Error parsing message: " + err);
             await this.triggerReconnect(false);
           }
         });
+
       } catch (err: any) {
         reject(err);
       }
@@ -406,7 +417,7 @@ export default class Grass {
     try {
       await randomDelay();
       const response = await axios.get(url, {
-        httpAgent: new HttpsProxyAgent(this.rotatingProxy),
+        httpAgent: new HttpProxyAgent(this.rotatingProxy),
         httpsAgent: new HttpsProxyAgent(this.rotatingProxy),
         timeout: 12_000,
       });
@@ -486,7 +497,7 @@ export default class Grass {
       } catch (err: any) {
         logger.debug("Reconnection failed:" + err.message);
         this.setThreadState("reconnect retry");
-        await delay(1_000);
+        await randomDelay();
         await this.triggerReconnect(false);
       }
     }, 120_000);
@@ -573,7 +584,8 @@ export default class Grass {
       );
     }
 
-    this.proxy = new HttpsProxyAgent(this.currentProxyUrl as string);
+    this.httpsAgent = new HttpsProxyAgent(this.currentProxyUrl as string);
+    this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
     this.configureInstance();
     logger.debug(`Proxy changed to: ${this.currentProxyUrl}`);
   }
@@ -584,43 +596,51 @@ export default class Grass {
    * и может быть обработана внешним блоком catch для повторного вызова triggerReconnect.
    */
   async triggerReconnect(needProxyChange = false): Promise<void> {
-    this.setThreadState("reconnecting");
-    this.stopPeriodicTasks();
-    this.browserId = uuidv4();
-    await randomDelay();
-
-    if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws.on("error", () => {});
-      this.ws.close();
-      this.ws.terminate();
-      this.ws = undefined;
+    if (this.isReconnecting) {
+      logger.debug("Already reconnecting, skipping triggerReconnect.");
+      return;
     }
+    this.isReconnecting = true;
+    try {
+      this.setThreadState("reconnecting");
+      this.stopPeriodicTasks();
+      this.browserId = uuidv4();
+      await randomDelay();
 
-    if (needProxyChange) {
-      await this.changeProxy();
-    }
-
-    let reconnected = false;
-    while (!reconnected) {
-      try {
-        const { destinations, token } = await this.checkIn();
-        await this.connectWebSocket(destinations[0] as string, token);
-        logger.debug("Reconnected successfully.");
-        this.setThreadState("mining");
-        reconnected = true;
-      } catch (error) {
-        logger.debug("Reconnection failed:" + error);
-        this.retryCount++;
-        if (this.retryCount >= 10) {
-          await delay(30_000);
-          this.retryCount = 0;
-        }
-        this.setThreadState("reconnect retry");
-        await randomDelay();
-        await delay(1_000);
-        // The loop will try again without further recursive calls.
+      if (this.ws) {
+        this.ws.removeAllListeners();
+        this.ws.on("error", () => {});
+        this.ws.close();
+        this.ws.terminate();
+        this.ws = undefined;
       }
+
+      if (needProxyChange) {
+        await this.changeProxy();
+      }
+
+      let reconnected = false;
+      while (!reconnected) {
+        try {
+          const { destinations, token } = await this.checkIn();
+          await this.connectWebSocket(destinations[0] as string, token);
+          logger.debug("Reconnected successfully.");
+          this.setThreadState("mining");
+          reconnected = true;
+        } catch (error: any) {
+          logger.debug("Reconnection failed:" + error);
+          this.retryCount++;
+          if (this.retryCount >= 10) {
+            await delay(30_000);
+            this.retryCount = 0;
+          }
+          this.setThreadState("reconnect retry");
+          await randomDelay();
+        }
+      }
+    } finally {
+      // Сброс состояния реконнекта вне зависимости от результата
+      this.isReconnecting = false;
     }
   }
 
@@ -634,9 +654,6 @@ export default class Grass {
     stickyProxy: string,
     rotatingProxy: string,
   ): Promise<void> {
-    this.setThreadState("starting mining");
-    this.email = email;
-
     if (rotatingProxy) {
       this.rotatingProxy = rotatingProxy;
       this.isGlobalProxy = false;
@@ -646,14 +663,7 @@ export default class Grass {
     }
 
     try {
-      await this.login(email, password, stickyProxy);
-    } catch (err) {
-      await this.changeProxy();
-      await delay(1_000);
-      await this.startMining(email, password, stickyProxy, this.rotatingProxy);
-    }
-
-    try {
+      this.setThreadState("starting mining");
       await randomDelay();
 
       if (this.isPrimary) {
@@ -669,7 +679,7 @@ export default class Grass {
       this.setThreadState("mining error");
       logger.debug("Error during mining process:" + error);
       await randomDelay();
-      await delay(1_000);
+      await randomDelay();
       await this.triggerReconnect(false);
     }
   }

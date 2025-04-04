@@ -1,13 +1,8 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import {delay, headersInterceptor} from "./lib/helper.js";
+import {delay, getRandomNumber, headersInterceptor} from "./lib/helper.js";
 import axios from "axios";
 import config from "./lib/config.js";
-
-axios.interceptors.request.use(
-  headersInterceptor,
-  (error: any) => Promise.reject(error),
-);
 
 const processGrassAccount = async (
   login: string,
@@ -27,7 +22,18 @@ const processGrassAccount = async (
   for (let i = 0; i < proxyThreads; i++) {
     const isLowAmount = isPrimary && proxyThreads < 30;
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-    const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount);
+    const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login);
+
+    if(i === 0 && isPrimary) {
+      try {
+        await grass.login(login, password, stickyProxy);
+      } catch (err) {
+        await this.changeProxy();
+        await delay(getRandomNumber(config.accDelay[0], config.accDelay[1]));
+        await this.login(login, password, stickyProxy);
+      }
+    }
+
     promises.push(
       grass.startMining(login, password, stickyProxy, rotatingProxy),
     );
