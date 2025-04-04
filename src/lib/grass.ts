@@ -315,24 +315,24 @@ export default class Grass {
           resolve();
         });
 
-        // Если возникает ошибка или сокет закрывается – пытаемся переподключиться.
-        const reconnectHandler = async (...args: any[]) => {
-          logger.debug(
-            "WebSocket encountered an error or closed. Reconnecting...",
-          );
-          this.stopPeriodicTasks();
-          await this.triggerReconnect(false);
-        };
-
         this.ws.on("error", async () => {
           logger.debug("Error occured");
+          this.isReconnecting = false; // Принудительный сброс
           await this.triggerReconnect(false);
         });
-        this.ws.on("close", reconnectHandler);
+        this.ws.on("close", async () => {
+          logger.debug(
+              "WebSocket encountered an error or closed. Reconnecting...",
+          );
+          this.stopPeriodicTasks();
+          this.isReconnecting = false; // Принудительный сброс
+          await this.triggerReconnect(false);
+        });
         this.ws.on("unexpected-response", async (req, res) => {
           logger.debug(
             `WebSocket unexpected-response. Status code: ${res.statusCode}`,
           );
+          this.isReconnecting = false; // Принудительный сброс
           await this.triggerReconnect(false);
         });
 
