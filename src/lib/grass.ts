@@ -594,6 +594,12 @@ export default class Grass {
       return;
     }
     this.isReconnecting = true;
+
+    // Запускаем таймер heartbeat для режима переподключения, чтобы периодически отправлять состояние.
+    const reconnectHeartbeatInterval = setInterval(() => {
+      this.setThreadState("reconnecting");
+    }, 30000);
+
     try {
       this.setThreadState("reconnecting");
       this.stopPeriodicTasks();
@@ -624,7 +630,7 @@ export default class Grass {
           logger.debug("Reconnection failed:" + error);
           this.retryCount++;
           if (this.retryCount >= 10) {
-            await delay(30_000);
+            await delay(30000);
             this.retryCount = 0;
           }
           this.setThreadState("reconnect retry");
@@ -632,10 +638,11 @@ export default class Grass {
         }
       }
     } finally {
-      // Сброс состояния реконнекта вне зависимости от результата
+      clearInterval(reconnectHeartbeatInterval);
       this.isReconnecting = false;
     }
   }
+
 
   /**
    * Запуск процесса майнинга.
