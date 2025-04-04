@@ -28,9 +28,9 @@ const processGrassAccount = async (
       try {
         await grass.login(login, password, stickyProxy);
       } catch (err) {
-        await this.changeProxy();
+        await grass.changeProxy();
         await delay(getRandomNumber(config.accDelay[0], config.accDelay[1]));
-        await this.login(login, password, stickyProxy);
+        await grass.login(login, password, stickyProxy);
       }
     }
 
