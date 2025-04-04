@@ -317,8 +317,7 @@ export default class Grass {
 
         this.ws.on("error", async () => {
           logger.debug("Error occured");
-          this.isReconnecting = false; // Принудительный сброс
-          await this.triggerReconnect(false);
+          this.ws?.close();
         });
         this.ws.on("close", async () => {
           logger.debug(
