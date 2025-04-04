@@ -273,13 +273,6 @@ export default class Grass {
     }
   }
 
-  /**
-   * Открывает WebSocket-соединение, обёрнутое в Promise.
-   * При ошибке (например, при отправке сообщения или закрытии сокета) вызывается reject.
-   */
-
-
-
   private handleHttpRequest = async (requestUrl: string, message: any) => {
     const result = await this.performHttpRequest(requestUrl);
     const responseMessage = {
