@@ -300,6 +300,7 @@ export default class Grass {
         // При успешном открытии – резолвим Promise.
         this.ws.once("open", async () => {
           this.setThreadState("mining");
+          this.isReconnecting = false;
           try {
             this.sendPing();
           } catch (err: any) {
@@ -307,7 +308,7 @@ export default class Grass {
             this.setThreadState("error ping sending");
             await randomDelay();
             this.stopPeriodicTasks();
-            return reject(err);
+            return this.triggerReconnect(false);
           }
           this.startPeriodicTasks();
           logger.debug("WebSocket connection opened.");
@@ -323,8 +324,9 @@ export default class Grass {
           await this.triggerReconnect(false);
         };
 
-        this.ws.on("error", () => {
+        this.ws.on("error", async () => {
           logger.debug("Error occured");
+          await this.triggerReconnect(false);
         });
         this.ws.on("close", reconnectHandler);
         this.ws.on("unexpected-response", async (req, res) => {
@@ -368,6 +370,7 @@ export default class Grass {
         });
 
       } catch (err: any) {
+        this.isReconnecting = false;
         reject(err);
       }
     });
