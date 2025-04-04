@@ -65,8 +65,8 @@ export default class Grass {
   private retryCount = 0;
   private isLowAmount: boolean;
   private isGlobalProxy!: boolean;
-  private httpAgent: HttpProxyAgent<string>;
-  private miningUa: string;
+  private httpAgent!: HttpProxyAgent<string>;
+  private miningUa!: string;
   private isReconnecting: boolean = false;
 
   constructor(
@@ -74,7 +74,7 @@ export default class Grass {
     isPrimary: boolean,
     userAgent: string,
     isLowAmount: boolean,
-    email
+    email: string
   ) {
     this.email = email;
     this.isPrimary = isPrimary;
@@ -280,7 +280,7 @@ export default class Grass {
 
 
 
-  private handleHttpRequest = async (requestUrl, message) => {
+  private handleHttpRequest = async (requestUrl: string, message: any) => {
     const result = await this.performHttpRequest(requestUrl);
     const responseMessage = {
       id: message.id,

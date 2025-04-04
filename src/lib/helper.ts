@@ -31,7 +31,7 @@ function getPlatformFromUserAgent(ua = "") {
 }
 
 
-export const headersInterceptor = (config) => {
+export const headersInterceptor = (config: any) => {
   if (
       config.baseURL &&
       (config.baseURL.includes("app.getgrass.io") ||
