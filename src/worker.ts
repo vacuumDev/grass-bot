@@ -24,14 +24,12 @@ const processGrassAccount = async (
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login);
 
-    if(i === 0 && isPrimary) {
-      try {
-        await grass.login(login, password, stickyProxy);
-      } catch (err) {
-        await grass.changeProxy();
-        await delay(getRandomNumber(config.accDelay[0], config.accDelay[1]));
-        await grass.login(login, password, stickyProxy);
-      }
+    try {
+      await grass.login(login, password, stickyProxy);
+    } catch (err) {
+      await grass.changeProxy();
+      await delay(getRandomNumber(config.accDelay[0], config.accDelay[1]));
+      await grass.login(login, password, stickyProxy);
     }
 
     promises.push(
