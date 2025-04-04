@@ -676,6 +676,7 @@ export default class Grass {
       logger.debug("Error during mining process:" + error);
       await randomDelay();
       await randomDelay();
+      this.isReconnecting = false;
       await this.triggerReconnect(false);
     }
   }
