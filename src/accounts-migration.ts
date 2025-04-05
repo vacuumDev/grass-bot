@@ -40,7 +40,6 @@ const main = async () => {
   fillAccounts();
   const [minThreads, maxThreads] = config.threads ?? [180, 220];
 
-  await delay(10000)
   const readyAccountsPath = path.join(process.cwd(), "data/ready_accounts.txt");
   if (fs.existsSync(readyAccountsPath)) {
     const fileContent = fs.readFileSync(readyAccountsPath, "utf-8");
