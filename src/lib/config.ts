@@ -7,6 +7,7 @@ export interface Account {
   stickyProxy: string;
   password: string;
   rotatingProxy: string;
+  brandVersion: string;
 }
 
 interface Config {
@@ -19,6 +20,7 @@ interface Config {
   rotatingProxy: string;
   stickyProxy: string;
   debug: boolean;
+  countries: string[]
 }
 
 const config: Config = JSON.parse(fs.readFileSync("data/config.json", "utf-8"));

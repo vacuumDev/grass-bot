@@ -6,12 +6,11 @@ import UserResponseData from "../dto/user-response.dto.js";
 import { IpResponseData } from "../dto/ip-info.dto.js";
 import WebSocket from "ws";
 import { v4 as uuidv4 } from "uuid";
-import ProxyManager from "./proxy-manager.js";
 import fs from "fs";
 import RedisWorker from "./redis-worker.js";
 import { logger } from "./logger.js";
 import UserAgent from "user-agents";
-import {delay, getRandomNumber, headersInterceptor} from "./helper.js";
+import {delay, getRandomBrandVersion, headersInterceptor} from "./helper.js";
 import config from "./config.js";
 import {HttpProxyAgent} from "http-proxy-agent";
 
@@ -68,13 +67,15 @@ export default class Grass {
   private httpAgent!: HttpProxyAgent<string>;
   private miningUa!: string;
   private isReconnecting: boolean = false;
+  private brandVersion: string;
 
   constructor(
     i: number,
     isPrimary: boolean,
     userAgent: string,
     isLowAmount: boolean,
-    email: string
+    email: string,
+    brandVersion: string
   ) {
     this.email = email;
     this.isPrimary = isPrimary;
@@ -82,6 +83,7 @@ export default class Grass {
     this.index = i;
     this.userAgent = userAgent ? userAgent : this.userAgent;
     this.isLowAmount = isLowAmount;
+    this.brandVersion = brandVersion;
   }
 
   private getRegion(): string {
@@ -132,6 +134,7 @@ export default class Grass {
 
     this.grassApi = axios.create(config);
 
+    this.grassApi.defaults.brandVersion = this.brandVersion;
     this.grassApi.interceptors.request.use(
         headersInterceptor,
         (error: any) => Promise.reject(error),
@@ -145,9 +148,7 @@ export default class Grass {
     stickyProxy: string,
   ): Promise<void> {
     this.setThreadState("logging in");
-    this.currentProxyUrl = stickyProxy
-      ? stickyProxy.replace("{ID}", generateRandom12Hex())
-      : ProxyManager.getProxy();
+    this.currentProxyUrl = stickyProxy.replace("{ID}", generateRandom12Hex());
     this.httpsAgent = new HttpsProxyAgent(this.currentProxyUrl as string);
     this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
 
@@ -178,6 +179,7 @@ export default class Grass {
             httpsAgent: this.httpsAgent,
             httpAgent: this.httpAgent,
             timeout: 12_000,
+            brandVersion: this.brandVersion
           },
         );
       this.accessToken = res.data.result.data.accessToken;
@@ -231,6 +233,8 @@ export default class Grass {
   async checkIn(): Promise<{ destinations: string[]; token: string }> {
     this.setThreadState("checking in");
     this.miningUa = new UserAgent({ deviceCategory: "desktop" }).toString();
+    const brandVersion = String(getRandomBrandVersion());
+    axios.defaults.brandVersion = brandVersion;
     try {
       const data = {
         browserId: this.browserId,
@@ -251,6 +255,7 @@ export default class Grass {
             "User-Agent": this.miningUa
           },
           timeout: 12_000,
+          brandVersion
         },
       );
       const responseData = res.data;

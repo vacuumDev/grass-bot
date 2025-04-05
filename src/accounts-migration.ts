@@ -2,15 +2,45 @@ import RedisWorker from "./lib/redis-worker.js";
 import path from "path";
 import fs from "fs";
 import { logger } from "./lib/logger.js";
-import { getRandomNumber } from "./lib/helper.js";
+import {delay, generateRandom12Hex, getRandomBrandVersion, getRandomNumber} from "./lib/helper.js";
 import config, { Account } from "./lib/config.js";
+import UserAgent from "user-agents";
 
 let accounts = config.accounts;
 
-const main = async () => {
-  await RedisWorker.init();
+const fillAccounts = () => {
   const [minThreads, maxThreads] = config.threads ?? [180, 220];
 
+  accounts = accounts.map((acc: any) => {
+    const country = config.countries[getRandomNumber(0, config.countries.length - 1)];
+    return {
+      login: acc.login,
+      password: acc.password ?? 'NO_PASS',
+      proxyThreads: acc.proxyThreads ?? getRandomNumber(minThreads, maxThreads),
+      userAgent: acc.userAgent ?? new UserAgent({ deviceCategory: 'desktop' }).toString(), // пример, можешь подставить свою генерацию
+      stickyProxy: acc.stickyProxy ?? config.stickyProxy
+          .replace("{ID}", generateRandom12Hex())
+          .replace("{COUNTRY}", country), // пример
+      rotatingProxy:
+          acc.rotatingProxy ??
+          config.rotatingProxy.replace("{COUNTRY}", country),
+      brandVersion: acc.brandVersion ?? String(getRandomBrandVersion()), // пример
+    } as Account;
+  });
+
+  logger.debug("Accounts have been filled with default values if missing.");
+  config.accounts = accounts;
+  fs.writeFileSync("data/config.json", JSON.stringify(config, null, 2));
+  logger.debug("Config file updated after filling accounts.");
+};
+
+
+const main = async () => {
+  await RedisWorker.init();
+  fillAccounts();
+  const [minThreads, maxThreads] = config.threads ?? [180, 220];
+
+  await delay(10000)
   const readyAccountsPath = path.join(process.cwd(), "data/ready_accounts.txt");
   if (fs.existsSync(readyAccountsPath)) {
     const fileContent = fs.readFileSync(readyAccountsPath, "utf-8");
@@ -37,6 +67,18 @@ const main = async () => {
           let rotatingProxy: string = "";
 
           if (parts.length === 12) rotatingProxy = parts[11] as string;
+          else {
+            const match = stickyProxy.match(/country-([a-zA-Z0-9]+)/);
+
+            if (match) {
+              rotatingProxy = config.rotatingProxy.replace(`{COUNTRY}`, match[1]);
+            }
+          }
+
+          let brandVersion: string = "";
+
+          if (parts.length === 13) brandVersion = parts[12] as string;
+          else brandVersion = String(getRandomBrandVersion());
 
           const account: any = {
             login: email,
@@ -44,11 +86,10 @@ const main = async () => {
             userAgent,
             stickyProxy,
             password,
+            rotatingProxy,
+            brandVersion
           };
 
-          if (rotatingProxy !== "") {
-            account.rotatingProxy = rotatingProxy;
-          }
           try {
             await RedisWorker.setSession(
               email as string,

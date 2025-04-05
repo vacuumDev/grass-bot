@@ -1,7 +1,6 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import {delay, getRandomNumber, headersInterceptor} from "./lib/helper.js";
-import axios from "axios";
+import {delay, getRandomBrandVersion, getRandomNumber, headersInterceptor} from "./lib/helper.js";
 import config from "./lib/config.js";
 
 const processGrassAccount = async (
@@ -12,9 +11,11 @@ const processGrassAccount = async (
   proxyThreads: number,
   isPrimary: boolean,
   userAgent: string,
+  brandVersion: string
 ) => {
   await RedisWorker.init();
   const promises = [];
+  brandVersion = brandVersion != null ? brandVersion : String(getRandomBrandVersion());
 
   const min = config.delay[0],
     max = config.delay[1];
@@ -22,7 +23,7 @@ const processGrassAccount = async (
   for (let i = 0; i < proxyThreads; i++) {
     const isLowAmount = isPrimary && proxyThreads < 30;
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-    const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login);
+    const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
 
     try {
       await grass.login(login, password, stickyProxy);
@@ -52,6 +53,7 @@ process.on(
     isPrimary: boolean;
     proxyThreads: number;
     userAgent: string;
+    brandVersion: string;
   }) => {
     const {
       login,
@@ -61,6 +63,7 @@ process.on(
       proxyThreads,
       isPrimary,
       userAgent,
+      brandVersion
     } = msg;
     try {
       await processGrassAccount(
@@ -71,6 +74,7 @@ process.on(
         proxyThreads,
         isPrimary,
         userAgent,
+        brandVersion
       );
     } catch (error: any) {
       // Send error message back if needed

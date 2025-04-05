@@ -51,6 +51,7 @@ const runWorker = (
   threads: number,
   isPrimary: boolean,
   userAgent: string,
+  brandVersion: string
 ) => {
   return new Promise((_resolve, _reject) => {
     const workerPath = path.join(process.cwd(), "dist/worker.js");
@@ -111,6 +112,7 @@ const runWorker = (
       proxyThreads: threads,
       isPrimary,
       userAgent,
+      brandVersion
     });
   });
 };
@@ -134,6 +136,7 @@ const main = async () => {
       rotatingProxy,
       proxyThreads,
       userAgent,
+      brandVersion
     } = account;
     workerPromises.push(
       runWorker(
@@ -144,6 +147,7 @@ const main = async () => {
         proxyThreads,
         true,
         userAgent,
+        brandVersion
       ),
     );
     await randomDelay();

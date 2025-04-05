@@ -1,3 +1,5 @@
+import axios from "axios";
+
 export function getRandomNumber(min: number, max: number): number {
   if (min > max) {
     throw new Error("min should be less than or equal to max");
@@ -31,7 +33,7 @@ function getPlatformFromUserAgent(ua = "") {
 }
 
 
-export const headersInterceptor = (config: any) => {
+export const headersInterceptor = (config) => {
   if (
       config.baseURL &&
       (config.baseURL.includes("app.getgrass.io") ||
@@ -48,7 +50,6 @@ export const headersInterceptor = (config: any) => {
     }
 
     const platform = getPlatformFromUserAgent(config.headers['User-Agent']);
-    const randomBrandVersion = Math.floor(Math.random() * 90) + 10; // от 10 до 99
 
     config.headers = {
       accept: "application/json, text/plain, */*",
@@ -60,7 +61,7 @@ export const headersInterceptor = (config: any) => {
       referer: "https://app.getgrass.io/",
       ...(isChrome && {
         "sec-ch-ua":
-            `"Chromium";v="${chromeVersion}", "Not:A-Brand";v="${randomBrandVersion}", "Google Chrome";v="${chromeVersion}"`,
+            `"Chromium";v="${chromeVersion}", "Not:A-Brand";v="${config.brandVersion}", "Google Chrome";v="${chromeVersion}"`,
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": `"${platform}"`,
       }),
@@ -71,9 +72,10 @@ export const headersInterceptor = (config: any) => {
     };
 
   }
+
+  delete config.brandVersion;
   return config;
 };
-
 export function shuffle(array: any[]) {
   let currentIndex = array.length;
 
@@ -87,3 +89,16 @@ export function shuffle(array: any[]) {
     ];
   }
 }
+
+
+const versions = [99, 8, 110];
+
+export function generateRandom12Hex() {
+  let hex = "";
+  for (let i = 0; i < 12; i++) {
+    hex += Math.floor(Math.random() * 16).toString(16);
+  }
+  return hex;
+}
+
+export const getRandomBrandVersion = () => versions[Math.floor(Math.random() * versions.length)];
