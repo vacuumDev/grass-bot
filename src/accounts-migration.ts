@@ -12,7 +12,13 @@ const fillAccounts = () => {
   const [minThreads, maxThreads] = config.threads ?? [180, 220];
 
   accounts = accounts.map((acc: any) => {
-    const country = config.countries[getRandomNumber(0, config.countries.length - 1)];
+    let country = "";
+    const COUNTRY_RE =
+        /(?:[-_=](?:country|region)[-_]|[-=])([a-z]{2})(?=[.\-_:]|$)/i;
+    if(acc.stickyProxy && acc.stickyProxy.match(COUNTRY_RE))
+      country = acc.stickyProxy.match(COUNTRY_RE)[1]
+    else country = config.countries[getRandomNumber(0, config.countries.length - 1)];
+
     return {
       login: acc.login,
       password: acc.password ?? 'NO_PASS',
