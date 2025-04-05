@@ -288,6 +288,7 @@ export default class Grass {
 
     return new Promise<void>((resolve, reject) => {
       try {
+        this.isReconnecting = false;
         this.ws = new WebSocket(wsUrl, {
           agent: new HttpsProxyAgent(this.rotatingProxy),
           headers: {
@@ -296,7 +297,6 @@ export default class Grass {
           },
           handshakeTimeout: 12_000,
         });
-        this.isReconnecting = false;
 
         // При успешном открытии – резолвим Promise.
         this.ws.once("open", async () => {
@@ -367,7 +367,6 @@ export default class Grass {
         });
 
       } catch (err: any) {
-        this.isReconnecting = false;
         reject(err);
       }
     });
