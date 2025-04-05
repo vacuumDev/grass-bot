@@ -296,11 +296,11 @@ export default class Grass {
           },
           handshakeTimeout: 12_000,
         });
+        this.isReconnecting = false;
 
         // При успешном открытии – резолвим Promise.
         this.ws.once("open", async () => {
           this.setThreadState("mining");
-          this.isReconnecting = false;
           try {
             this.sendPing();
           } catch (err: any) {
@@ -324,14 +324,12 @@ export default class Grass {
               "WebSocket encountered an error or closed. Reconnecting...",
           );
           this.stopPeriodicTasks();
-          this.isReconnecting = false; // Принудительный сброс
           await this.triggerReconnect(false);
         });
         this.ws.on("unexpected-response", async (req, res) => {
           logger.debug(
             `WebSocket unexpected-response. Status code: ${res.statusCode}`,
           );
-          this.isReconnecting = false; // Принудительный сброс
           await this.triggerReconnect(false);
         });
 
