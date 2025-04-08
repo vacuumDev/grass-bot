@@ -340,6 +340,12 @@ app.get("/getStatistics", (req, res) => {
     countries[region] = (countries[region] || 0) + 1;
   });
 
+  const threadsByCountry = {};
+  for (const status of workerStatuses.values()) {
+    const region = status.region || "N/A";
+    threadsByCountry[region] = (threadsByCountry[region] || 0) + 1;
+  }
+
   const statsData = {
     totalPoints: grandTotalPoints,
     totalChange24h: grandTotalChange24h,
@@ -359,7 +365,8 @@ app.get("/getStatistics", (req, res) => {
       usedPercentage: Number(usedMemPercentage.toFixed(2)),
     },
     countries, // List of countries and count of accounts per country
-    totalAccounts: accounts.length
+    totalAccounts: accounts.length,
+    threadsByCountry
   };
 
 
