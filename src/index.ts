@@ -340,11 +340,17 @@ app.get("/getStatistics", (req, res) => {
     countries[region] = (countries[region] || 0) + 1;
   });
 
-  const threadsByCountry = {};
-  for (const status of workerStatuses.values()) {
-    const region = status.region || "N/A";
-    threadsByCountry[region] = (threadsByCountry[region] || 0) + 1;
-  }
+   const threadsByCountry = {};
+   for (const status of workerStatuses.values()) {
+     const region = status.region || "N/A";
+     if (!threadsByCountry[region]) {
+       threadsByCountry[region] = { working: 0, total: 0 };
+     }
+     threadsByCountry[region].total++;
+     if (status.state === "mining") {
+       threadsByCountry[region].working++;
+     }
+   }
 
   const statsData = {
     totalPoints: grandTotalPoints,
