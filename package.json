@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/express": "^5.0.1",
     "@types/imap": "^0.8.42",
     "@types/node": "^22.13.10",
     "@types/user-agents": "^1.0.4",
@@ -24,6 +25,7 @@
     "@pm2/io": "^6.1.0",
     "axios": "^1.8.1",
     "dotenv": "^16.4.7",
+    "express": "^5.1.0",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "imap": "^0.8.19",

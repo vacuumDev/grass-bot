@@ -6,12 +6,29 @@ import readline from "readline";
 import { logger } from "./lib/logger.js";
 import { shuffle } from "./lib/helper.js";
 import config, { Account } from "./lib/config.js";
+import os from "os";
+import express from 'express'
 
 io.init({
   metrics: {
     http: true,
   },
 });
+
+const app = express();
+const PORT = config.httpPort || 3000;
+
+// Токен для авторизации (задается в конфиге или по умолчанию)
+const AUTH_TOKEN = config.authToken || "secret-token";
+
+// Middleware для проверки токена в заголовке authorization
+app.use((req, res, next) => {
+  if (req.headers.authorization !== AUTH_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+});
+
 
 const workerStatuses = new Map<string, any>();
 const accountStartTimes = new Map<string, number>();
@@ -254,10 +271,101 @@ const stats = () => {
   let info: string | undefined =
     `Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`;
   console.log(info);
-  info = undefined;
-  rows = undefined;
   grouped.clear();
   return;
 };
 stats();
 setInterval(stats, 5_000);
+
+// Эндпоинт для получения статистики
+app.get("/getStatistics", (req, res) => {
+  const now = Date.now();
+  const aggregated = new Map();
+
+  for (const account of accounts) {
+    const email = account.login;
+    const points = accountPoints.get(email) || 0;
+    const history = accountPointsHistory.get(email) || [];
+    const cutoff = now - MS_IN_24H;
+    const oldEntry = history.find((e) => e.timestamp <= cutoff) || (history[0] || { points: 0 });
+    const change24h = points - oldEntry.points;
+
+    let threadsWorking = 0;
+    let totalThreads = 0;
+    for (const status of workerStatuses.values()) {
+      if (status.email === email) {
+        totalThreads++;
+        if (status.state === "mining") {
+          threadsWorking++;
+        }
+      }
+    }
+    aggregated.set(email, { points, change24h, threadsWorking, totalThreads });
+  }
+
+  let grandTotalPoints = 0;
+  let grandTotalChange24h = 0;
+  let grandThreadsWorking = 0;
+  let grandTotalThreads = 0;
+
+  aggregated.forEach((data) => {
+    grandTotalPoints += data.points;
+    grandTotalChange24h += data.change24h;
+    grandThreadsWorking += data.threadsWorking;
+    grandTotalThreads += data.totalThreads;
+  });
+
+  const overallStatus = grandThreadsWorking > 0 ? "working" : "inactive";
+  const cpus = os.cpus();
+  const cpuUsages = cpus.map((cpu, index) => {
+    const times = cpu.times;
+    const total = times.user + times.nice + times.sys + times.idle + times.irq;
+    const usage = ((total - times.idle) / total) * 100;
+    return { core: index, usage: Number(usage.toFixed(2)) };
+  });
+  const averageCpuUsage =
+      cpuUsages.reduce((acc, cur) => acc + cur.usage, 0) / cpuUsages.length;
+
+  // Memory usage in GB
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const usedMemGB = usedMem / (1024 ** 3);
+  const totalMemGB = totalMem / (1024 ** 3);
+  const usedMemPercentage = (usedMem / totalMem) * 100;
+
+  const countries = {};
+  accounts.forEach((acc) => {
+    const region = accountRegions.get(acc.login) || "N/A";
+    countries[region] = (countries[region] || 0) + 1;
+  });
+
+  const statsData = {
+    totalPoints: grandTotalPoints,
+    totalChange24h: grandTotalChange24h,
+    status: overallStatus,
+    threads: {
+      working: grandThreadsWorking,
+      total: grandTotalThreads,
+    },
+    cpu: {
+      averageUsage: Number(averageCpuUsage.toFixed(2)),
+      cores: cpuUsages, // Array with usage for each core
+      numCores: cpus.length, // Total number of cores
+    },
+    memory: {
+      used: Number(usedMemGB.toFixed(2)),
+      total: Number(totalMemGB.toFixed(2)),
+      usedPercentage: Number(usedMemPercentage.toFixed(2)),
+    },
+    countries, // List of countries and count of accounts per country
+    totalAccounts: accounts.length
+  };
+
+
+  res.json(statsData);
+});
+
+app.listen(PORT, () => {
+  logger.info(`Express server listening on port ${PORT}`);
+});

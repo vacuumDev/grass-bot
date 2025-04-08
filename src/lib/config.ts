@@ -20,7 +20,9 @@ interface Config {
   rotatingProxy: string;
   stickyProxy: string;
   debug: boolean;
-  countries: string[]
+  countries: string[],
+  httpPort: string;
+  authToken: string;
 }
 
 const config: Config = JSON.parse(fs.readFileSync("data/config.json", "utf-8"));
