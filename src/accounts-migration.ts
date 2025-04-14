@@ -8,6 +8,31 @@ import UserAgent from "user-agents";
 
 let accounts = config.accounts;
 
+const fixBrokenLines = (
+    fileContent: string,
+): { fixedContent: string; lines: string[] } => {
+  const rawLines = fileContent.split("\n");
+  const fixedLines: string[] = [];
+
+  for (let raw of rawLines) {
+    raw = raw.replace(/\r$/, ""); // защита от CRLF
+    if (!raw.trim()) continue; // пропускаем пустые
+
+    if (raw.startsWith("|")) {
+      // строка‑продолжение
+      if (fixedLines.length === 0) {
+        // на всякий случай, если файл начинается с «|»
+        fixedLines.push(raw.replace(/^\|+/, ""));
+      } else {
+        fixedLines[fixedLines.length - 1] += raw;
+      }
+    } else {
+      fixedLines.push(raw);
+    }
+  }
+
+  return { fixedContent: fixedLines.join("\n"), lines: fixedLines };
+};
 const fillAccounts = () => {
   const [minThreads, maxThreads] = config.threads ?? [180, 220];
 
@@ -48,8 +73,13 @@ const main = async () => {
 
   const readyAccountsPath = path.join(process.cwd(), "data/ready_accounts.txt");
   if (fs.existsSync(readyAccountsPath)) {
-    const fileContent = fs.readFileSync(readyAccountsPath, "utf-8");
-    const lines = fileContent.split("\n").filter((line) => line.trim() !== "");
+    const originalContent = fs.readFileSync(readyAccountsPath, "utf-8");
+    const { fixedContent, lines } = fixBrokenLines(originalContent);
+
+    if (fixedContent !== originalContent) {
+      fs.writeFileSync(readyAccountsPath, fixedContent);
+      logger.debug("ready_accounts.txt has been cleaned up.");
+    }
     for (const line of lines) {
       if (line.includes("|")) {
         const parts: string[] = line.split("|");
