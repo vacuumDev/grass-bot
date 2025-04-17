@@ -626,13 +626,8 @@ export default class Grass {
           reconnected = true;
         } catch (error: any) {
           logger.debug("Reconnection failed:" + error);
-          this.retryCount++;
-          if (this.retryCount >= 10) {
-            await delay(30_000);
-            this.retryCount = 0;
-          }
+          await delay(150_000); // delay as in grass app
           this.setThreadState("reconnect retry");
-          await randomDelay();
         }
       }
     } finally {
