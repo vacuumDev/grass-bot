@@ -670,9 +670,8 @@ export default class Grass {
     } catch (error: any) {
       this.setThreadState("mining error");
       logger.debug("Error during mining process:" + error);
-      await randomDelay();
-      await randomDelay();
       this.isReconnecting = false;
+      await delay(150_000); // delay as in grass app
       await this.triggerReconnect(false);
     }
   }
