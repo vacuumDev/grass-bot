@@ -271,6 +271,12 @@ const stats = () => {
   let info: string | undefined =
     `Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`;
   console.log(info);
+
+  if (totalThreads === 0) {
+    logger.warn("No working threads detected. Restarting app...");
+    process.exit(1);
+  }
+  
   grouped.clear();
   return;
 };
