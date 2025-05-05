@@ -557,11 +557,7 @@ export default class Grass {
           `sid-${newSid}`,
         );
         logger.debug(`Generated new SID: ${newSid}`);
-      } else {
-        this.currentProxyUrl = ProxyManager.getProxy();
       }
-    } else {
-      this.currentProxyUrl = ProxyManager.getProxy();
     }
 
     const account = config.accounts.find(
@@ -649,9 +645,6 @@ export default class Grass {
     if (rotatingProxy) {
       this.rotatingProxy = rotatingProxy;
       this.isGlobalProxy = false;
-    } else {
-      this.rotatingProxy = ProxyManager.getProxy(true);
-      this.isGlobalProxy = true;
     }
 
     try {
