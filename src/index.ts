@@ -29,7 +29,7 @@ app.use((req, res, next) => {
   next();
 });
 
-
+let started = Date.now();
 const workerStatuses = new Map<string, any>();
 const accountStartTimes = new Map<string, number>();
 const accountPoints = new Map<string, number>();
@@ -272,7 +272,7 @@ const stats = () => {
     `Total Accounts: ${grouped.size} | Total Threads Live: ${totalThreads} | Total Points: ${totalPoints} | Total 24h Change: ${totalChange24h}`;
   console.log(info);
 
-  if (totalThreads === 0) {
+  if (totalThreads === 0 && Date.now() - started > 120_000) {
     logger.warn("No working threads detected. Restarting app...");
     process.exit(1);
   }
