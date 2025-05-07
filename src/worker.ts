@@ -30,8 +30,8 @@ const processGrassAccount = async (
         await grass.login(login, password, stickyProxy);
         break;
       } catch (err) {
-        await grass.changeProxy();
         await delay(5000 + getRandomNumber(config.accDelay[0], config.accDelay[1]));
+        stickyProxy = await grass.changeProxy();
       }
     }
 

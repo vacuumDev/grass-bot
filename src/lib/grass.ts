@@ -148,7 +148,7 @@ export default class Grass {
     stickyProxy: string,
   ): Promise<void> {
     this.setThreadState("logging in");
-    this.currentProxyUrl = stickyProxy.replace("{ID}", generateRandom12Hex());
+    this.currentProxyUrl = stickyProxy;
     this.httpsAgent = new HttpsProxyAgent(this.currentProxyUrl as string);
     this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
 
@@ -545,7 +545,7 @@ export default class Grass {
   }
 
   // Смена прокси.
-  async changeProxy(): Promise<void> {
+  async changeProxy(): Promise<string> {
     logger.debug("Changing proxy...");
 
     if (this.currentProxyUrl) {
@@ -582,6 +582,8 @@ export default class Grass {
     this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
     this.configureInstance();
     logger.debug(`Proxy changed to: ${this.currentProxyUrl}`);
+
+    return this.currentProxyUrl;
   }
 
   /**
