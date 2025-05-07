@@ -153,20 +153,20 @@ export default class Grass {
     this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
 
     try {
-      const session = await RedisWorker.getSession(email);
-      if (session && !config.needRelogin) {
-        const parsedSession = JSON.parse(session);
-        this.accessToken = parsedSession.accessToken;
-        this.userId = parsedSession.userId;
-      }
-
-      if ((this.accessToken || session) && !config.needRelogin) {
-        this.configureInstance();
-        this.setThreadState("logged in");
-        return;
-      }
-
-      await randomDelay();
+      // const session = await RedisWorker.getSession(email);
+      // if (session && !config.needRelogin && false) {
+      //   const parsedSession = JSON.parse(session);
+      //   this.accessToken = parsedSession.accessToken;
+      //   this.userId = parsedSession.userId;
+      // }
+      //
+      // if ((this.accessToken || session) && !config.needRelogin && false) {
+      //   this.configureInstance();
+      //   this.setThreadState("logged in");
+      //   return;
+      // }
+      //
+      // await randomDelay();
       const res: AxiosResponse<ApiResponseDto<LoginResponseData>> =
         await axios.post(
           "https://api.getgrass.io/login",
