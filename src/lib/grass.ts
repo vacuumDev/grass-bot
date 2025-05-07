@@ -154,13 +154,13 @@ export default class Grass {
 
     try {
       const session = await RedisWorker.getSession(email);
-      if (session) {
+      if (session && !config.needRelogin) {
         const parsedSession = JSON.parse(session);
         this.accessToken = parsedSession.accessToken;
         this.userId = parsedSession.userId;
       }
 
-      if (this.accessToken || session) {
+      if ((this.accessToken || session) && !config.needRelogin) {
         this.configureInstance();
         this.setThreadState("logged in");
         return;
@@ -182,6 +182,7 @@ export default class Grass {
             brandVersion: this.brandVersion
           },
         );
+      logger.debug('Successfully logged in');
       this.accessToken = res.data.result.data.accessToken;
       this.refreshToken = res.data.result.data.refreshToken;
 

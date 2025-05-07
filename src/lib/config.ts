@@ -23,6 +23,7 @@ interface Config {
   countries: string[],
   httpPort: string;
   authToken: string;
+  needRelogin: boolean;
 }
 
 const config: Config = JSON.parse(fs.readFileSync("data/config.json", "utf-8"));
