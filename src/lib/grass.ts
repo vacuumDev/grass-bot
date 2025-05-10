@@ -625,7 +625,7 @@ export default class Grass {
           reconnected = true;
         } catch (error: any) {
           logger.debug("Reconnection failed:" + error);
-          await delay(150_000); // delay as in grass app
+          await randomDelay(); // delay as in grass app
           this.setThreadState("reconnect retry");
         }
       }
@@ -667,7 +667,7 @@ export default class Grass {
       this.setThreadState("mining error");
       logger.debug("Error during mining process:" + error);
       this.isReconnecting = false;
-      await delay(150_000); // delay as in grass app
+      await randomDelay();
       await this.triggerReconnect(false);
     }
   }
