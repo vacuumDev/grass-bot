@@ -1,4 +1,6 @@
 import axios from "axios";
+import {HttpProxyAgent} from "http-proxy-agent";
+import {HttpsProxyAgent} from "https-proxy-agent";
 
 export function getRandomNumber(min: number, max: number): number {
   if (min > max) {
@@ -10,6 +12,20 @@ export function getRandomNumber(min: number, max: number): number {
 export const delay = async (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
+
+export async function getValidProxy(proxyUrl: string) {
+  try {
+    await axios.get("https://api.ipify.org?format=json", {
+      httpsAgent: new HttpsProxyAgent(proxyUrl),
+      httpAgent: new HttpProxyAgent(proxyUrl),
+      timeout: 10000,
+    });
+    // Если ошибок нет – прокси рабочая
+    return proxyUrl;
+  } catch (error) {
+    return false;
+  }
+}
 
 
 

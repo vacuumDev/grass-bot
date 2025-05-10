@@ -1,6 +1,6 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import {delay, getRandomBrandVersion, getRandomNumber, headersInterceptor} from "./lib/helper.js";
+import {delay, getRandomBrandVersion, getRandomNumber, getValidProxy, headersInterceptor} from "./lib/helper.js";
 import config from "./lib/config.js";
 
 const processGrassAccount = async (
@@ -24,6 +24,14 @@ const processGrassAccount = async (
     const isLowAmount = isPrimary && proxyThreads < 30;
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
+
+    let validProxy = await getValidProxy(stickyProxy);
+    while (!validProxy) {
+      validProxy = await getValidProxy(stickyProxy);
+      await delay(100);
+    }
+
+    stickyProxy = validProxy;
 
     while(true) {
       try {
