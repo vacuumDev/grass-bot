@@ -158,7 +158,6 @@ export default class Grass {
 
     try {
       const session = await RedisWorker.getSession(email);
-      console.log(session)
       if (session && !needRelogin) {
         const parsedSession = JSON.parse(session);
         this.accessToken = parsedSession.accessToken;
