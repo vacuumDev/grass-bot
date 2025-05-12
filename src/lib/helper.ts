@@ -15,15 +15,14 @@ export const delay = async (ms: number) => {
 
 export async function getValidProxy(proxyUrl: string) {
   try {
-    await axios.get("https://api.getgrass.io/e65c798e44045cf3241e5bdc52aff12c/YBgQLp3KPSQ51vP5", {
+    await axios.get("https://api.ipify.org?format=json", {
       httpsAgent: new HttpsProxyAgent(proxyUrl),
       httpAgent: new HttpProxyAgent(proxyUrl),
-      timeout: 2000,
+      timeout: 10000,
     });
     // Если ошибок нет – прокси рабочая
     return proxyUrl;
   } catch (error) {
-    console.log(error.message)
     return false;
   }
 }

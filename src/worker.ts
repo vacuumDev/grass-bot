@@ -1,38 +1,29 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import {
-  delay,
-  generateRandom12Hex,
-  getRandomBrandVersion,
-  getRandomNumber,
-  getValidProxy,
-  headersInterceptor
-} from "./lib/helper.js";
+import {delay, getRandomBrandVersion, getRandomNumber, getValidProxy, headersInterceptor} from "./lib/helper.js";
 import config from "./lib/config.js";
-import {logger} from "./lib/logger.js";
 
 const processGrassAccount = async (
-  login: string,
-  password: string,
-  stickyProxy: string,
-  rotatingProxy: string,
-  proxyThreads: number,
-  isPrimary: boolean,
-  userAgent: string,
-  brandVersion: string
+    login: string,
+    password: string,
+    stickyProxy: string,
+    rotatingProxy: string,
+    proxyThreads: number,
+    isPrimary: boolean,
+    userAgent: string,
+    brandVersion: string
 ) => {
   await RedisWorker.init();
   const promises = [];
   brandVersion = brandVersion != null ? brandVersion : String(getRandomBrandVersion());
 
   const min = config.delay[0],
-    max = config.delay[1];
+      max = config.delay[1];
 
   for (let i = 0; i < proxyThreads; i++) {
     const isLowAmount = isPrimary && proxyThreads < 30;
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
-
 
     let validProxy = await getValidProxy(stickyProxy);
     while (!validProxy) {
@@ -42,7 +33,6 @@ const processGrassAccount = async (
 
     stickyProxy = validProxy;
 
-    logger.debug(`Proxy: ${stickyProxy}`);
     while(true) {
       try {
         await grass.login(login, password, stickyProxy);
@@ -61,7 +51,7 @@ const processGrassAccount = async (
 
 
     promises.push(
-      grass.startMining(login, password, stickyProxy, rotatingProxy),
+        grass.startMining(login, password, stickyProxy, rotatingProxy),
     );
     await delay(ms);
   }
@@ -71,29 +61,18 @@ const processGrassAccount = async (
 };
 
 process.on(
-  "message",
-  async (msg: {
-    login: string;
-    password: string;
-    stickyProxy: string;
-    rotatingProxy: string;
-    isPrimary: boolean;
-    proxyThreads: number;
-    userAgent: string;
-    brandVersion: string;
-  }) => {
-    const {
-      login,
-      password,
-      stickyProxy,
-      rotatingProxy,
-      proxyThreads,
-      isPrimary,
-      userAgent,
-      brandVersion
-    } = msg;
-    try {
-      await processGrassAccount(
+    "message",
+    async (msg: {
+      login: string;
+      password: string;
+      stickyProxy: string;
+      rotatingProxy: string;
+      isPrimary: boolean;
+      proxyThreads: number;
+      userAgent: string;
+      brandVersion: string;
+    }) => {
+      const {
         login,
         password,
         stickyProxy,
@@ -102,11 +81,22 @@ process.on(
         isPrimary,
         userAgent,
         brandVersion
-      );
-    } catch (error: any) {
-      // Send error message back if needed
-      //@ts-ignore
-      process.send({ success: false, error: error.message });
-    }
-  },
+      } = msg;
+      try {
+        await processGrassAccount(
+            login,
+            password,
+            stickyProxy,
+            rotatingProxy,
+            proxyThreads,
+            isPrimary,
+            userAgent,
+            brandVersion
+        );
+      } catch (error: any) {
+        // Send error message back if needed
+        //@ts-ignore
+        process.send({ success: false, error: error.message });
+      }
+    },
 );
