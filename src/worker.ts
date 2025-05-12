@@ -35,8 +35,6 @@ const processGrassAccount = async (
 
     let validProxy = await getValidProxy(stickyProxy);
     while (!validProxy) {
-      console.log(stickyProxy)
-      console.log(validProxy)
       validProxy = await getValidProxy(stickyProxy);
       const sidRegex = /sid-[0-9a-f]{12}4(?=-filter)/;
       const newSid = generateRandom12Hex() + "4";
@@ -55,7 +53,6 @@ const processGrassAccount = async (
     logger.debug(`Proxy: ${stickyProxy}`);
     while(true) {
       try {
-        console.log(1)
         await grass.login(login, password, stickyProxy);
         break;
       } catch (err) {
