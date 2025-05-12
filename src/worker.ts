@@ -25,13 +25,13 @@ const processGrassAccount = async (
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
 
-    let validProxy = await getValidProxy(stickyProxy);
-    while (!validProxy) {
-      validProxy = await getValidProxy(stickyProxy);
-      await delay(100);
-    }
-
-    stickyProxy = validProxy;
+    // let validProxy = await getValidProxy(stickyProxy);
+    // while (!validProxy) {
+    //   validProxy = await getValidProxy(stickyProxy);
+    //   await delay(100);
+    // }
+    //
+    // stickyProxy = validProxy;
 
     while(true) {
       try {
