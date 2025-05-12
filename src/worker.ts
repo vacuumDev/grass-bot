@@ -1,7 +1,15 @@
 import Grass from "./lib/grass.js";
 import RedisWorker from "./lib/redis-worker.js";
-import {delay, getRandomBrandVersion, getRandomNumber, getValidProxy, headersInterceptor} from "./lib/helper.js";
+import {
+  delay,
+  generateRandom12Hex,
+  getRandomBrandVersion,
+  getRandomNumber,
+  getValidProxy,
+  headersInterceptor
+} from "./lib/helper.js";
 import config from "./lib/config.js";
+import {logger} from "./lib/logger.js";
 
 const processGrassAccount = async (
   login: string,
@@ -27,14 +35,27 @@ const processGrassAccount = async (
 
     let validProxy = await getValidProxy(stickyProxy);
     while (!validProxy) {
+      console.log(stickyProxy)
+      console.log(validProxy)
       validProxy = await getValidProxy(stickyProxy);
+      const sidRegex = /sid-[0-9a-f]{12}4(?=-filter)/;
+      const newSid = generateRandom12Hex() + "4";
+
+      if (sidRegex.test(stickyProxy)) {
+        stickyProxy = stickyProxy.replace(
+            sidRegex,
+            `sid-${newSid}`,
+        );
+      }
       await delay(100);
     }
 
     stickyProxy = validProxy;
 
+    logger.debug(`Proxy: ${stickyProxy}`);
     while(true) {
       try {
+        console.log(1)
         await grass.login(login, password, stickyProxy);
         break;
       } catch (err) {

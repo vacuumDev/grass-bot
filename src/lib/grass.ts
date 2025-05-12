@@ -48,6 +48,7 @@ export default class Grass {
   private pingInterval?: NodeJS.Timeout;
   private currentProxyUrl?: string;
   private userId!: string;
+  private password!: string;
   private userAgent: string = new UserAgent({
     deviceCategory: "desktop",
   }).toString();
@@ -146,27 +147,31 @@ export default class Grass {
     email: string,
     password: string,
     stickyProxy: string,
+    needRelogin: boolean = false,
   ): Promise<void> {
     this.setThreadState("logging in");
+    this.email = email;
+    this.password = password;
     this.currentProxyUrl = stickyProxy;
     this.httpsAgent = new HttpsProxyAgent(this.currentProxyUrl as string);
     this.httpAgent = new HttpProxyAgent(this.currentProxyUrl as string);
 
     try {
-      // const session = await RedisWorker.getSession(email);
-      // if (session && !config.needRelogin && false) {
-      //   const parsedSession = JSON.parse(session);
-      //   this.accessToken = parsedSession.accessToken;
-      //   this.userId = parsedSession.userId;
-      // }
-      //
-      // if ((this.accessToken || session) && !config.needRelogin && false) {
-      //   this.configureInstance();
-      //   this.setThreadState("logged in");
-      //   return;
-      // }
-      //
-      // await randomDelay();
+      const session = await RedisWorker.getSession(email);
+      console.log(session)
+      if (session && !needRelogin) {
+        const parsedSession = JSON.parse(session);
+        this.accessToken = parsedSession.accessToken;
+        this.userId = parsedSession.userId;
+      }
+
+      if ((this.accessToken || session) && !needRelogin) {
+        this.configureInstance();
+        this.setThreadState("logged in");
+        return;
+      }
+
+      await randomDelay();
       const res: AxiosResponse<ApiResponseDto<LoginResponseData>> =
         await axios.post(
           "https://api.getgrass.io/login",
@@ -664,6 +669,9 @@ export default class Grass {
       await this.connectWebSocket(destinations[0] as string, token);
       await randomDelay();
     } catch (error: any) {
+      if(error.isAxiosError && error.message.includes("520")) {
+        await this.login(email, password, stickyProxy, true);
+      }
       this.setThreadState("mining error");
       logger.debug("Error during mining process:" + error);
       this.isReconnecting = false;

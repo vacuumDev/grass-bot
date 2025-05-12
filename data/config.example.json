@@ -784,6 +784,5 @@
   "debug": true,
   "redisUrl": "redis://:fhg384f3h387f383f30h43h84@localhost:6379",
   "httpPort": 3000,
-  "authToken": "fhdsfjdshkjfdshkfjhsdfkjhfkshfjkdshfkjshfdjkshfjkshfshj",
-  "needRelogin": true
+  "authToken": "fhdsfjdshkjfdshkfjhsdfkjhfkshfjkdshfkjshfdjkshfjkshfshj"
 }
