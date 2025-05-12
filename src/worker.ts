@@ -33,7 +33,7 @@ const processGrassAccount = async (
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
 
-    let validProxy = await getValidProxy(stickyProxy);
+    let validProxy = stickyProxy;
     while (!validProxy) {
       validProxy = await getValidProxy(stickyProxy);
       const sidRegex = /sid-[0-9a-f]{12}4(?=-filter)/;
