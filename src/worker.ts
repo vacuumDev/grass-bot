@@ -33,18 +33,10 @@ const processGrassAccount = async (
     const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     const grass = new Grass(i, isPrimary && i === 0, userAgent, isLowAmount, login, brandVersion);
 
-    let validProxy = stickyProxy;
+
+    let validProxy = await getValidProxy(stickyProxy);
     while (!validProxy) {
       validProxy = await getValidProxy(stickyProxy);
-      const sidRegex = /sid-[0-9a-f]{12}4(?=-filter)/;
-      const newSid = generateRandom12Hex() + "4";
-
-      if (sidRegex.test(stickyProxy)) {
-        stickyProxy = stickyProxy.replace(
-            sidRegex,
-            `sid-${newSid}`,
-        );
-      }
       await delay(100);
     }
 
